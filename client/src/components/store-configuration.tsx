@@ -95,6 +95,7 @@ export default function StoreConfiguration() {
                       <div className="relative">
                         <Input
                           placeholder="My Store"
+                          className="pl-10"
                           {...field}
                           data-testid="input-store-name"
                         />
@@ -115,6 +116,7 @@ export default function StoreConfiguration() {
                       <div className="relative">
                         <Input
                           placeholder="your-store.myshopify.com"
+                          className="pl-10"
                           {...field}
                           data-testid="input-store-url"
                         />
@@ -136,6 +138,7 @@ export default function StoreConfiguration() {
                         <Input
                           type="password"
                           placeholder="shpat_xxxxxxxxxxxxxxxxxxxx"
+                          className="pl-10"
                           {...field}
                           data-testid="input-access-token"
                         />

@@ -93,6 +93,7 @@ export default function ProductSearch({ onProductSelect }: ProductSearchProps) {
                       <div className="relative">
                         <Input
                           placeholder="Enter SKU (e.g., FL-001-XL) or paste Shopify URL"
+                          className="pl-10 pr-20"
                           {...field}
                           data-testid="input-search-query"
                         />

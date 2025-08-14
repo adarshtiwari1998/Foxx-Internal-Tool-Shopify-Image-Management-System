@@ -5,6 +5,7 @@ import ProductSearch from "@/components/product-search";
 import ImageManagement from "@/components/image-management";
 import ActionResults from "@/components/action-results";
 import StoreSwitcher from "@/components/store-switcher";
+import HeaderStoreSwitcher from "@/components/header-store-switcher";
 import type { Store, ProductVariant } from "@/lib/types";
 
 export default function Home() {
@@ -36,22 +37,14 @@ export default function Home() {
                 </p>
               </div>
             </div>
-            <div className="flex items-center space-x-3">
-              <span className="text-sm text-gray-500">Connected to:</span>
-              <span 
-                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800"
-                data-testid="text-active-store"
-              >
-                {activeStore?.storeUrl || "No store connected"}
-              </span>
-            </div>
+            <HeaderStoreSwitcher />
           </div>
         </div>
       </header>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Store Configuration */}
-        <div className="mb-8">
+        <div className="mb-8" data-testid="store-configuration">
           <StoreConfiguration />
         </div>
 
