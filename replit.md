@@ -2,6 +2,13 @@
 
 This is a Shopify Image Management System built for internal tools at Foxx Life Sciences. The application allows users to manage product images across multiple Shopify stores, supporting operations like image replacement, addition, and updates. It provides a comprehensive interface for searching products by SKU or URL, uploading images, and tracking operation results.
 
+## Recent Changes (August 14, 2025)
+- ✓ Migrated from Neon Database to Render PostgreSQL for production stability
+- ✓ Updated database configuration with SSL support for secure connections
+- ✓ Fixed TypeScript issues in routes and Shopify service
+- ✓ Successfully deployed database schema with stores and product_operations tables
+- ✓ Configured cross-browser persistence for store configurations
+
 # User Preferences
 
 Preferred communication style: Simple, everyday language.
@@ -27,6 +34,7 @@ Preferred communication style: Simple, everyday language.
 - **Stores Table**: Manages Shopify store configurations (credentials, URLs, active status)
 - **Product Operations Table**: Tracks image management operations with status and metadata
 - **Migration System**: Drizzle Kit for database schema versioning
+- **Database Provider**: Render PostgreSQL with SSL connections for production stability
 
 ## Authentication & External Integration
 - **Shopify Integration**: Custom service class for GraphQL API communication

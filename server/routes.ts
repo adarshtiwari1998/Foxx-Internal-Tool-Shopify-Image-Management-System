@@ -1,10 +1,14 @@
-import type { Express } from "express";
+import type { Express, Request } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { ShopifyService } from "./services/shopify";
 import { insertStoreSchema, insertProductOperationSchema } from "@shared/schema";
 import multer from "multer";
 import { z } from "zod";
+
+interface MulterRequest extends Request {
+  file?: Express.Multer.File;
+}
 
 const upload = multer({ 
   storage: multer.memoryStorage(),
@@ -26,13 +30,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       // Simple test query to verify credentials
-      await shopify.graphqlRequest(`
-        query {
-          shop {
-            name
-          }
-        }
-      `);
+      await shopify.testConnection();
 
       const store = await storage.createStore(storeData);
       res.json(store);
@@ -112,7 +110,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Image management routes
-  app.post("/api/images/upload", upload.single('image'), async (req, res) => {
+  app.post("/api/images/upload", upload.single('image'), async (req: MulterRequest, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ message: "No image file provided" });

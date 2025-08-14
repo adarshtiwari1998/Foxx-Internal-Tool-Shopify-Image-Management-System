@@ -33,7 +33,7 @@ export class ShopifyService {
     this.config = config;
   }
 
-  private async graphqlRequest(query: string, variables: any = {}) {
+  async graphqlRequest(query: string, variables: any = {}) {
     const response = await fetch(`https://${this.config.storeUrl}/admin/api/2024-01/graphql.json`, {
       method: 'POST',
       headers: {
@@ -57,6 +57,16 @@ export class ShopifyService {
     }
 
     return data.data;
+  }
+
+  async testConnection(): Promise<void> {
+    await this.graphqlRequest(`
+      query {
+        shop {
+          name
+        }
+      }
+    `);
   }
 
   async searchProductBySku(sku: string): Promise<ProductVariant | null> {
