@@ -1,15 +1,12 @@
-import { useState } from "react";
+
 import { useQuery } from "@tanstack/react-query";
 import StoreConfiguration from "@/components/store-configuration";
-import ProductSearch from "@/components/product-search";
-import ImageManagement from "@/components/image-management";
+import UnifiedImageWorkflow from "@/components/unified-image-workflow";
 import ActionResults from "@/components/action-results";
-import StoreSwitcher from "@/components/store-switcher";
 import HeaderStoreSwitcher from "@/components/header-store-switcher";
-import type { Store, ProductVariant } from "@/lib/types";
+import type { Store } from "@/lib/types";
 
 export default function Home() {
-  const [selectedProduct, setSelectedProduct] = useState<ProductVariant | null>(null);
 
   const { data: activeStore } = useQuery<Store | null>({
     queryKey: ["/api/stores/active"],
@@ -48,26 +45,17 @@ export default function Home() {
           <StoreConfiguration />
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-          {/* Product Search */}
-          <div className="space-y-6">
-            <ProductSearch onProductSelect={setSelectedProduct} />
+        {/* Main Content - Unified Workflow */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Main Workflow - Takes 2 columns */}
+          <div className="lg:col-span-2 space-y-6">
+            <UnifiedImageWorkflow />
           </div>
 
-          {/* Image Management */}
+          {/* Right Column - Results and History */}
           <div className="space-y-6">
-            <ImageManagement selectedProduct={selectedProduct} />
+            <ActionResults />
           </div>
-        </div>
-
-        {/* Action Results */}
-        <div className="mt-8">
-          <ActionResults />
-        </div>
-
-        {/* Store Switcher */}
-        <div className="mt-8">
-          <StoreSwitcher />
         </div>
       </div>
     </div>

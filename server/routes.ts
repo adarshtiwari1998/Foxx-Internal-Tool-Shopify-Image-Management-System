@@ -228,6 +228,280 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // New unified file upload routes
+  app.post("/api/files/staged-upload", async (req, res) => {
+    try {
+      const schema = z.object({
+        filename: z.string(),
+        mimeType: z.string(),
+        fileSize: z.number(),
+      });
+
+      const data = schema.parse(req.body);
+      
+      const activeStore = await storage.getActiveStore();
+      if (!activeStore) {
+        return res.status(400).json({ message: "No active store configured" });
+      }
+
+      const shopify = new ShopifyService({
+        storeUrl: activeStore.storeUrl,
+        accessToken: activeStore.accessToken,
+      });
+
+      const stagedTarget = await shopify.createStagedUpload(data.filename, data.mimeType, data.fileSize);
+      res.json(stagedTarget);
+    } catch (error: any) {
+      res.status(500).json({ 
+        message: error.message || "Failed to create staged upload",
+        error: error.toString()
+      });
+    }
+  });
+
+  app.post("/api/files/create-from-staged", async (req, res) => {
+    try {
+      const schema = z.object({
+        stagedUrl: z.string().url(),
+        altText: z.string().optional(),
+      });
+
+      const data = schema.parse(req.body);
+      
+      const activeStore = await storage.getActiveStore();
+      if (!activeStore) {
+        return res.status(400).json({ message: "No active store configured" });
+      }
+
+      const shopify = new ShopifyService({
+        storeUrl: activeStore.storeUrl,
+        accessToken: activeStore.accessToken,
+      });
+
+      const file = await shopify.createFileFromStaged(data.stagedUrl, data.altText);
+      res.json(file);
+    } catch (error: any) {
+      res.status(500).json({ 
+        message: error.message || "Failed to create file from staged upload",
+        error: error.toString()
+      });
+    }
+  });
+
+  app.get("/api/products/:id/images", async (req, res) => {
+    try {
+      const activeStore = await storage.getActiveStore();
+      if (!activeStore) {
+        return res.status(400).json({ message: "No active store configured" });
+      }
+
+      const shopify = new ShopifyService({
+        storeUrl: activeStore.storeUrl,
+        accessToken: activeStore.accessToken,
+      });
+
+      const images = await shopify.getProductImages(req.params.id);
+      res.json(images);
+    } catch (error: any) {
+      res.status(500).json({ 
+        message: error.message || "Failed to get product images",
+        error: error.toString()
+      });
+    }
+  });
+
+  app.delete("/api/files/:id", async (req, res) => {
+    try {
+      const activeStore = await storage.getActiveStore();
+      if (!activeStore) {
+        return res.status(400).json({ message: "No active store configured" });
+      }
+
+      const shopify = new ShopifyService({
+        storeUrl: activeStore.storeUrl,
+        accessToken: activeStore.accessToken,
+      });
+
+      const success = await shopify.deleteFile(req.params.id);
+      res.json({ success });
+    } catch (error: any) {
+      res.status(500).json({ 
+        message: error.message || "Failed to delete file",
+        error: error.toString()
+      });
+    }
+  });
+
+  app.patch("/api/images/:id/alt-text", async (req, res) => {
+    try {
+      const schema = z.object({
+        altText: z.string(),
+      });
+
+      const data = schema.parse(req.body);
+      
+      const activeStore = await storage.getActiveStore();
+      if (!activeStore) {
+        return res.status(400).json({ message: "No active store configured" });
+      }
+
+      const shopify = new ShopifyService({
+        storeUrl: activeStore.storeUrl,
+        accessToken: activeStore.accessToken,
+      });
+
+      const success = await shopify.updateImageAltText(req.params.id, data.altText);
+      res.json({ success });
+    } catch (error: any) {
+      res.status(500).json({ 
+        message: error.message || "Failed to update alt text",
+        error: error.toString()
+      });
+    }
+  });
+
+  // Enhanced image operation route for comprehensive workflow
+  app.post("/api/products/image-operation", async (req, res) => {
+    try {
+      const schema = z.object({
+        inputType: z.enum(['sku', 'url', 'direct_image']),
+        inputValue: z.string(),
+        operationType: z.enum(['replace', 'add']),
+        imageSource: z.string().url(),
+        altText: z.string().optional(),
+        copyExistingAlt: z.boolean().optional(),
+        targetImageId: z.string().optional(), // For replace operations
+      });
+
+      const data = schema.parse(req.body);
+      
+      const activeStore = await storage.getActiveStore();
+      if (!activeStore) {
+        return res.status(400).json({ message: "No active store configured" });
+      }
+
+      const shopify = new ShopifyService({
+        storeUrl: activeStore.storeUrl,
+        accessToken: activeStore.accessToken,
+      });
+
+      let productVariant = null;
+      let altTextToUse = data.altText || '';
+
+      // Step 1: Get product data based on input type
+      if (data.inputType === 'sku') {
+        productVariant = await shopify.searchProductBySku(data.inputValue);
+      } else if (data.inputType === 'url') {
+        productVariant = await shopify.getProductFromUrl(data.inputValue);
+      }
+
+      if (!productVariant && data.inputType !== 'direct_image') {
+        return res.status(404).json({ message: "Product not found" });
+      }
+
+      // Step 2: Handle alt text copying
+      if (data.copyExistingAlt && productVariant?.image?.altText) {
+        altTextToUse = productVariant.image.altText;
+      }
+
+      // Create operation record
+      const operationData = {
+        storeId: activeStore.id,
+        variantId: productVariant?.id,
+        productId: productVariant?.product.id,
+        operationType: data.operationType,
+        imageUrl: data.imageSource,
+        altText: altTextToUse,
+        status: 'pending' as const,
+        metadata: {
+          inputType: data.inputType,
+          inputValue: data.inputValue,
+          copyExistingAlt: data.copyExistingAlt,
+        },
+      };
+
+      const operation = await storage.createProductOperation(operationData);
+
+      try {
+        let result;
+        
+        if (data.operationType === 'replace' && productVariant) {
+          if (data.targetImageId) {
+            // Replace specific image
+            result = await shopify.replaceProductImage(
+              productVariant.product.id, 
+              data.targetImageId, 
+              data.imageSource, 
+              altTextToUse
+            );
+          } else if (productVariant.image) {
+            // Replace variant image
+            result = await shopify.replaceProductImage(
+              productVariant.product.id, 
+              productVariant.image.id, 
+              data.imageSource, 
+              altTextToUse
+            );
+          }
+        } else if (data.operationType === 'add' && productVariant) {
+          // Add new image to product
+          result = await shopify.addImageToProduct(
+            productVariant.product.id, 
+            data.imageSource, 
+            altTextToUse
+          );
+        }
+
+        // Generate preview/live URLs
+        let previewUrl = '';
+        let liveUrl = '';
+
+        if (productVariant) {
+          if (productVariant.product.status === 'DRAFT') {
+            previewUrl = await shopify.generatePreviewLink(productVariant.product.id);
+          } else {
+            liveUrl = shopify.getLiveProductUrl(productVariant.product.handle);
+          }
+        }
+
+        // Update operation as successful
+        await storage.updateProductOperation(operation.id, {
+          status: 'success',
+          previewUrl,
+          liveUrl,
+          metadata: { ...operationData.metadata, result },
+        });
+
+        res.json({
+          success: true,
+          operation: {
+            ...operation,
+            status: 'success',
+            previewUrl,
+            liveUrl,
+          },
+          result,
+          productVariant,
+        });
+
+      } catch (shopifyError: any) {
+        // Update operation as failed
+        await storage.updateProductOperation(operation.id, {
+          status: 'error',
+          errorMessage: shopifyError.message,
+        });
+
+        throw shopifyError;
+      }
+
+    } catch (error: any) {
+      res.status(500).json({ 
+        message: error.message || "Failed to perform image operation",
+        error: error.toString()
+      });
+    }
+  });
+
   // Operations history
   app.get("/api/operations", async (req, res) => {
     try {

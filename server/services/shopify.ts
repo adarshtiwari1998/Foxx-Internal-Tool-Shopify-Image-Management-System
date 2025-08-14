@@ -17,6 +17,15 @@ export interface ProductVariant {
     title: string;
     handle: string;
     status: string;
+    images?: {
+      edges: Array<{
+        node: {
+          id: string;
+          url: string;
+          altText?: string;
+        };
+      }>;
+    };
   };
 }
 
@@ -24,6 +33,22 @@ export interface ShopifyImage {
   id: string;
   url: string;
   altText?: string;
+}
+
+export interface StagedUploadTarget {
+  url: string;
+  resourceUrl: string;
+  parameters: Array<{
+    name: string;
+    value: string;
+  }>;
+}
+
+export interface FileUploadResult {
+  id: string;
+  url: string;
+  altText?: string;
+  fileStatus: string;
 }
 
 export class ShopifyService {
@@ -88,6 +113,15 @@ export class ShopifyService {
                 title
                 handle
                 status
+                images(first: 10) {
+                  edges {
+                    node {
+                      id
+                      url
+                      altText
+                    }
+                  }
+                }
               }
             }
           }
@@ -102,7 +136,14 @@ export class ShopifyService {
       return null;
     }
 
-    return edges[0].node;
+    const variant = edges[0].node;
+    
+    // If variant doesn't have an image but product has images, use the first product image
+    if (!variant.image && variant.product.images.edges.length > 0) {
+      variant.image = variant.product.images.edges[0].node;
+    }
+
+    return variant;
   }
 
   async getProductFromUrl(url: string): Promise<ProductVariant | null> {
@@ -319,5 +360,174 @@ export class ShopifyService {
 
   getLiveProductUrl(handle: string): string {
     return `https://${this.config.storeUrl.replace('.myshopify.com', '.com')}/products/${handle}`;
+  }
+
+  // New comprehensive file upload methods
+  async createStagedUpload(filename: string, mimeType: string, fileSize: number): Promise<StagedUploadTarget> {
+    const query = `
+      mutation stagedUploadsCreate($input: [StagedUploadInput!]!) {
+        stagedUploadsCreate(input: $input) {
+          stagedTargets {
+            url
+            resourceUrl
+            parameters {
+              name
+              value
+            }
+          }
+          userErrors {
+            field
+            message
+          }
+        }
+      }
+    `;
+
+    const data = await this.graphqlRequest(query, {
+      input: [{
+        filename,
+        mimeType,
+        httpMethod: "POST",
+        resource: "IMAGE",
+        fileSize: fileSize.toString()
+      }]
+    });
+
+    if (data.stagedUploadsCreate.userErrors?.length > 0) {
+      throw new Error(`Staged upload error: ${data.stagedUploadsCreate.userErrors[0].message}`);
+    }
+
+    return data.stagedUploadsCreate.stagedTargets[0];
+  }
+
+  async createFileFromStaged(stagedUrl: string, altText?: string): Promise<FileUploadResult> {
+    const query = `
+      mutation fileCreate($files: [FileCreateInput!]!) {
+        fileCreate(files: $files) {
+          files {
+            id
+            fileStatus
+            alt
+            ... on MediaImage {
+              image {
+                url
+                width
+                height
+              }
+            }
+          }
+          userErrors {
+            field
+            message
+          }
+        }
+      }
+    `;
+
+    const data = await this.graphqlRequest(query, {
+      files: [{
+        alt: altText || "",
+        contentType: "IMAGE",
+        originalSource: stagedUrl
+      }]
+    });
+
+    if (data.fileCreate.userErrors?.length > 0) {
+      throw new Error(`File creation error: ${data.fileCreate.userErrors[0].message}`);
+    }
+
+    const file = data.fileCreate.files[0];
+    return {
+      id: file.id,
+      url: file.image?.url || '',
+      altText: file.alt,
+      fileStatus: file.fileStatus
+    };
+  }
+
+  async deleteFile(fileId: string): Promise<boolean> {
+    const query = `
+      mutation fileDelete($fileIds: [ID!]!) {
+        fileDelete(fileIds: $fileIds) {
+          deletedFileIds
+          userErrors {
+            field
+            message
+          }
+        }
+      }
+    `;
+
+    const data = await this.graphqlRequest(query, { fileIds: [fileId] });
+
+    if (data.fileDelete.userErrors?.length > 0) {
+      throw new Error(`File deletion error: ${data.fileDelete.userErrors[0].message}`);
+    }
+
+    return data.fileDelete.deletedFileIds.includes(fileId);
+  }
+
+  async replaceProductImage(productId: string, oldImageId: string, newImageUrl: string, altText?: string): Promise<ShopifyImage> {
+    // First, delete the old image
+    await this.deleteFile(oldImageId);
+    
+    // Then add the new image
+    return await this.addImageToProduct(productId, newImageUrl, altText);
+  }
+
+  async getProductImages(productId: string): Promise<ShopifyImage[]> {
+    const query = `
+      query getProduct($id: ID!) {
+        product(id: $id) {
+          images(first: 50) {
+            edges {
+              node {
+                id
+                url
+                altText
+              }
+            }
+          }
+        }
+      }
+    `;
+
+    const data = await this.graphqlRequest(query, { id: productId });
+    
+    if (!data.product) {
+      return [];
+    }
+
+    return data.product.images.edges.map((edge: any) => edge.node);
+  }
+
+  async updateImageAltText(imageId: string, altText: string): Promise<boolean> {
+    const query = `
+      mutation productImageUpdate($productImage: ProductImageInput!) {
+        productImageUpdate(productImage: $productImage) {
+          image {
+            id
+            altText
+          }
+          userErrors {
+            field
+            message
+          }
+        }
+      }
+    `;
+
+    const data = await this.graphqlRequest(query, {
+      productImage: {
+        id: imageId,
+        altText: altText
+      }
+    });
+
+    if (data.productImageUpdate.userErrors?.length > 0) {
+      throw new Error(`Alt text update error: ${data.productImageUpdate.userErrors[0].message}`);
+    }
+
+    return true;
   }
 }
