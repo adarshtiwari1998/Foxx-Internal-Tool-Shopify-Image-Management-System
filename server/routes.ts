@@ -6,6 +6,7 @@ import { insertStoreSchema, insertProductOperationSchema, insertBatchOperationSc
 import multer from "multer";
 import { z } from "zod";
 import JSZip from "jszip";
+import FormData from "form-data";
 
 interface MulterRequest extends Request {
   file?: Express.Multer.File;
@@ -1049,7 +1050,6 @@ async function processBatchOperations(
           const stagedTarget = await shopify.createStagedUpload(filename, mimeType, imageBuffer.length);
           
           // Step 2: Upload file to staged URL using Node.js compatible approach
-          const FormData = require('form-data');
           const formData = new FormData();
           
           stagedTarget.parameters.forEach(param => {
