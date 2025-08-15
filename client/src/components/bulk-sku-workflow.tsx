@@ -277,6 +277,7 @@ export default function BulkSkuWorkflow() {
   const handleZipFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
+      console.log('ZIP file selected:', file.name, file.size, 'bytes');
       if (!file.name.toLowerCase().endsWith('.zip')) {
         toast({
           title: "Invalid File",
@@ -286,6 +287,8 @@ export default function BulkSkuWorkflow() {
         return;
       }
       setZipFile(file);
+      // Reset previous preview
+      setZipPreview(null);
       // Automatically preview the ZIP when selected
       previewZipFile(file);
     }
@@ -294,19 +297,32 @@ export default function BulkSkuWorkflow() {
   // ZIP preview mutation
   const zipPreviewMutation = useMutation({
     mutationFn: async (file: File) => {
-      const formData = new FormData();
-      formData.append('zipFile', file);
-      
-      const response = await fetch('/api/files/zip-preview', {
-        method: 'POST',
-        body: formData,
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      try {
+        const formData = new FormData();
+        formData.append('zipFile', file);
+        
+        console.log('Sending ZIP preview request for:', file.name);
+        
+        const response = await fetch('/api/files/zip-preview', {
+          method: 'POST',
+          body: formData,
+        });
+        
+        console.log('ZIP preview response status:', response.status);
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('ZIP preview error response:', errorText);
+          throw new Error(`Server error: ${response.status} - ${errorText}`);
+        }
+        
+        const result = await response.json();
+        console.log('ZIP preview result:', result);
+        return result;
+      } catch (error) {
+        console.error('ZIP preview fetch error:', error);
+        throw error;
       }
-      
-      return response.json();
     },
     onSuccess: (data) => {
       setZipPreview(data);
@@ -317,19 +333,25 @@ export default function BulkSkuWorkflow() {
       });
     },
     onError: (error: any) => {
+      console.error('ZIP preview mutation error:', error);
       setIsPreviewingZip(false);
       toast({
         title: "Preview Failed",
-        description: error.message,
+        description: error.message || "Failed to analyze ZIP file. Please try again.",
         variant: "destructive",
       });
     },
   });
 
   const previewZipFile = (file: File) => {
+    console.log('Starting ZIP preview for:', file.name, file.size, 'bytes');
     setIsPreviewingZip(true);
     setZipPreview(null);
-    zipPreviewMutation.mutate(file);
+    
+    // Small delay to ensure state is updated before API call
+    setTimeout(() => {
+      zipPreviewMutation.mutate(file);
+    }, 100);
   };
 
   // Handle batch operation submit
@@ -664,7 +686,7 @@ export default function BulkSkuWorkflow() {
                             {result.product.product.title} - {result.product.title}
                           </div>
                         )}
-                        {(result.product?.image?.altText || result.product?.product?.images?.[0]?.altText) && (
+                        {(result.product?.image?.altText || result.product?.product?.images?.edges?.[0]?.node?.altText) && (
                           <div className="text-xs text-blue-600 truncate max-w-md">
                             💬 Alt: {result.product.image?.altText || (result.product.product.images?.[0]?.altText)}
                           </div>
@@ -851,8 +873,30 @@ export default function BulkSkuWorkflow() {
                   data-testid="input-zip-file"
                 />
                 {zipFile && (
-                  <div className="text-sm text-muted-foreground">
-                    Selected: {zipFile.name}
+                  <div className="space-y-2">
+                    <div className="text-sm text-muted-foreground">
+                      Selected: {zipFile.name}
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => previewZipFile(zipFile)}
+                      disabled={isPreviewingZip}
+                      className="text-xs"
+                    >
+                      {isPreviewingZip ? (
+                        <>
+                          <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                          Analyzing...
+                        </>
+                      ) : (
+                        <>
+                          <Eye className="h-3 w-3 mr-1" />
+                          Preview ZIP Contents
+                        </>
+                      )}
+                    </Button>
                   </div>
                 )}
                 <div className="p-3 bg-blue-50 dark:bg-blue-950 rounded-lg">
@@ -964,7 +1008,7 @@ export default function BulkSkuWorkflow() {
                       <div key={result.sku} className="flex items-center space-x-3 p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
                         {/* Product Image Preview */}
                         <div className="w-12 h-12 border rounded overflow-hidden flex-shrink-0">
-                          {(result.product?.image?.url || result.product?.product?.images?.[0]?.src) ? (
+                          {(result.product?.image?.url || result.product?.product?.images?.edges?.[0]?.node?.url) ? (
                             <img 
                               src={result.product.image?.url || result.product.product.images[0].src}
                               alt={result.product.image?.altText || result.product.product.images?.[0]?.altText || 'Product image'}

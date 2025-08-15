@@ -741,7 +741,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log('=== ZIP CONTENTS DEBUG ===');
         Object.keys(zipContent.files).forEach(filename => {
           const file = zipContent.files[filename];
-          console.log(`File: "${filename}" | Dir: ${file.dir} | Size: ${file._data?.uncompressedSize || 0}`);
+          console.log(`File: "${filename}" | Dir: ${file.dir}`);
         });
         console.log('=== AVAILABLE SKUs ===');
         console.log(`SKUs to match: [${skus.join(', ')}]`);
@@ -875,7 +875,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           files.push({
             filename: filename,
             basename: filename.split('/').pop()?.split('.')[0] || '',
-            size: file._data?.uncompressedSize || 0,
+            size: 0, // Size determined during processing
             extension: filename.split('.').pop()?.toLowerCase() || ''
           });
         }
