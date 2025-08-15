@@ -4,6 +4,10 @@ This is a Shopify Image Management System built for internal tools at Foxx Life 
 
 ## Recent Changes (August 15, 2025)
 - ✓ Successfully migrated from Replit Agent to standard Replit environment
+- ✓ Fixed image replacement RESOURCE_NOT_FOUND error by improving error handling
+- ✓ Enhanced image replacement logic to handle variant images properly
+- ✓ Added support for draft product preview links in operation results
+- ✓ Updated frontend to pass correct data structure (SKU, existing image ID)
 - ✓ Improved Store Configuration UI with collapsible design to save space
 - ✓ Added "Add Store" button that only shows full form when needed
 - ✓ Enhanced user experience with compact store management interface

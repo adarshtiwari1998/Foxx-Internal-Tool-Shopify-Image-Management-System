@@ -468,11 +468,28 @@ export class ShopifyService {
   }
 
   async replaceProductImage(productId: string, oldImageId: string, newImageUrl: string, altText?: string): Promise<ShopifyImage> {
-    // First, delete the old image
-    await this.deleteFile(oldImageId);
+    // First, delete the old image if it exists and is valid
+    if (oldImageId && oldImageId !== 'null' && oldImageId !== '') {
+      try {
+        await this.deleteFile(oldImageId);
+      } catch (error) {
+        console.warn(`Failed to delete old image ${oldImageId}:`, error);
+        // Continue with adding new image even if deletion fails
+      }
+    }
     
     // Then add the new image
     return await this.addImageToProduct(productId, newImageUrl, altText);
+  }
+
+  async replaceVariantImage(variantId: string, productId: string, newImageUrl: string, altText?: string): Promise<ShopifyImage> {
+    // Create file from URL first
+    const uploadedImage = await this.uploadImage(newImageUrl, altText);
+    
+    // Update the variant to use this image
+    await this.updateProductVariantImage(variantId, uploadedImage.id);
+    
+    return uploadedImage;
   }
 
   async getProductImages(productId: string): Promise<ShopifyImage[]> {

@@ -165,12 +165,17 @@ export default function UnifiedImageWorkflow() {
   // Main image operation functionality
   const imageOperationMutation = useMutation({
     mutationFn: async (operationData: any) => {
-      const response = await apiRequest('POST', '/api/products/image-operation', operationData);
+      const response = await apiRequest('POST', '/api/products/update-image', operationData);
       return response.json();
     },
     onSuccess: (data: ImageOperationResult) => {
       setOperationResult(data);
       queryClient.invalidateQueries({ queryKey: ['/api/operations'] });
+      
+      // If we have updated product data, refresh the product preview
+      if (data.productVariant) {
+        setProductData(data.productVariant);
+      }
       
       toast({
         title: "Operation Successful",
@@ -227,21 +232,23 @@ export default function UnifiedImageWorkflow() {
       return;
     }
 
+    if (!productData) {
+      toast({
+        title: "Missing Product",
+        description: "Please search for a product first",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const operationData = {
-      inputType,
-      inputValue,
+      variantId: productData.id,
+      imageUrl: imageSource,
+      altText: altText || undefined,
       operationType,
-      imageSource,
-      altText,
-      copyExistingAlt,
-      targetImageId: productData?.image?.id,
-      ...(useCustomDimensions && imageDimensions.width && imageDimensions.height && {
-        dimensions: {
-          width: parseInt(imageDimensions.width),
-          height: parseInt(imageDimensions.height)
-        }
-      }),
-      filename: productData ? generateImageFilename(selectedFile || undefined) : undefined
+      productId: productData.product.id,
+      sku: productData.sku,
+      existingImageId: productData.image?.id,
     };
 
     imageOperationMutation.mutate(operationData);

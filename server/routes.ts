@@ -139,6 +139,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         altText: z.string().optional(),
         operationType: z.enum(['replace', 'add']),
         productId: z.string().optional(),
+        sku: z.string().optional(),
+        existingImageId: z.string().optional(),
       });
 
       const data = schema.parse(req.body);
@@ -173,20 +175,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Add new image to product
           result = await shopify.addImageToProduct(data.productId, data.imageUrl, data.altText);
         } else if (data.operationType === 'replace') {
-          // Upload image and update variant
-          const uploadedImage = await shopify.uploadImage(data.imageUrl, data.altText);
-          await shopify.updateProductVariantImage(data.variantId, uploadedImage.id);
-          result = uploadedImage;
+          // For replace operation, use the new method that handles variant images properly
+          if (data.productId) {
+            result = await shopify.replaceVariantImage(data.variantId, data.productId, data.imageUrl, data.altText);
+          } else {
+            // Fallback: create new image and update variant
+            const uploadedImage = await shopify.uploadImage(data.imageUrl, data.altText);
+            await shopify.updateProductVariantImage(data.variantId, uploadedImage.id);
+            result = uploadedImage;
+          }
         }
 
-        // Get product info for generating URLs
-        const productVariant = await shopify.searchProductBySku(req.body.sku || '');
+        // Get updated product info for generating URLs
+        let productVariant = null;
         let previewUrl = '';
         let liveUrl = '';
 
+        if (data.sku) {
+          productVariant = await shopify.searchProductBySku(data.sku);
+        }
+
         if (productVariant) {
           if (productVariant.product.status === 'DRAFT') {
-            previewUrl = await shopify.generatePreviewLink(productVariant.product.id);
+            try {
+              previewUrl = await shopify.generatePreviewLink(productVariant.product.id);
+            } catch (previewError) {
+              console.warn('Failed to generate preview link:', previewError);
+            }
           } else {
             liveUrl = shopify.getLiveProductUrl(productVariant.product.handle);
           }
@@ -209,6 +224,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             liveUrl,
           },
           result,
+          productVariant, // Include updated product data
         });
 
       } catch (shopifyError: any) {
