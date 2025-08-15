@@ -4,17 +4,18 @@ This is a Shopify Image Management System built for internal tools at Foxx Life 
 
 ## Recent Changes (August 15, 2025)
 - ✓ **Successfully completed migration from Replit Agent to standard Replit environment**
-- ✓ **Fixed critical image replacement errors** by restructuring Shopify API calls:
-  - Fixed GraphQL syntax errors in image creation mutations  
-  - Simplified image upload workflow to use direct file upload to Shopify Files
-  - Removed problematic productImageCreate mutation syntax issues
-  - Images now properly upload to Shopify Files (visible in Content > Files)
+- ✓ **Fixed critical image replacement errors** by updating to modern Shopify GraphQL API:
+  - **MAJOR FIX**: Replaced deprecated `productImageCreate` mutation with modern `productUpdateMedia`
+  - **MAJOR FIX**: Replaced deprecated `productImageDelete` with modern `productDeleteMedia`
+  - Updated to use current Shopify API specifications as per official documentation
+  - Fixed GraphQL syntax errors caused by outdated mutation types
+  - Images now properly attach to products using supported media operations
   - Enhanced error handling and logging for better debugging
 - ✓ **Improved image replacement logic** to handle variant images properly:
-  - Fixed replaceVariantImage method to upload image first, then update variant
+  - Fixed replaceVariantImage method to create product media first, then update variant
   - Added proper error handling that doesn't fail entire operation if variant update fails
-  - Images are uploaded to Shopify Files and can be found in admin panel
-  - Implemented proper cleanup of old images after successful replacement
+  - Images are properly created as product media and attached to variants
+  - Implemented proper cleanup of old media after successful replacement
 - ✓ Fixed image replacement RESOURCE_NOT_FOUND error by improving error handling
 - ✓ Added support for draft product preview links in operation results
 - ✓ Updated frontend to pass correct data structure (SKU, existing image ID)

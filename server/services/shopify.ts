@@ -276,16 +276,20 @@ export class ShopifyService {
     };
   }
 
-  async createProductImage(productId: string, imageUrl: string, altText?: string): Promise<ShopifyImage> {
+  async createProductMediaFromUrl(productId: string, imageUrl: string, altText?: string): Promise<ShopifyImage> {
     const query = `
-      mutation productImageCreate($productImage: ProductImageInput!) {
-        productImageCreate(productImage: $productImage) {
-          image {
-            id
-            url
-            altText
+      mutation productUpdateMedia($productId: ID!, $media: [UpdateMediaInput!]!) {
+        productUpdateMedia(productId: $productId, media: $media) {
+          media {
+            ... on MediaImage {
+              id
+              alt
+              image {
+                url
+              }
+            }
           }
-          userErrors {
+          mediaUserErrors {
             field
             message
           }
@@ -294,21 +298,23 @@ export class ShopifyService {
     `;
 
     const data = await this.graphqlRequest(query, {
-      productImage: {
-        productId: productId,
-        src: imageUrl,
-        altText: altText || '',
-      }
+      productId: productId,
+      media: [{
+        originalSource: imageUrl,
+        alt: altText || '',
+        mediaContentType: "IMAGE"
+      }]
     });
 
-    if (data.productImageCreate.userErrors?.length > 0) {
-      throw new Error(`Product image creation error: ${data.productImageCreate.userErrors[0].message}`);
+    if (data.productUpdateMedia.mediaUserErrors?.length > 0) {
+      throw new Error(`Product media creation error: ${data.productUpdateMedia.mediaUserErrors[0].message}`);
     }
 
+    const mediaImage = data.productUpdateMedia.media[0];
     return {
-      id: data.productImageCreate.image.id,
-      url: data.productImageCreate.image.url,
-      altText: data.productImageCreate.image.altText,
+      id: mediaImage.id,
+      url: mediaImage.image.url,
+      altText: mediaImage.alt,
     };
   }
 
@@ -348,8 +354,8 @@ export class ShopifyService {
   }
 
   async addImageToProduct(productId: string, imageUrl: string, altText?: string): Promise<ShopifyImage> {
-    // Create a proper product image that gets attached to the product
-    return await this.createProductImage(productId, imageUrl, altText);
+    // Create a proper product media that gets attached to the product
+    return await this.createProductMediaFromUrl(productId, imageUrl, altText);
   }
 
   async generatePreviewLink(productId: string): Promise<string | null> {
@@ -472,7 +478,7 @@ export class ShopifyService {
     // First, delete the old image if it exists and is valid
     if (oldImageId && oldImageId !== 'null' && oldImageId !== '') {
       try {
-        await this.deleteFile(oldImageId);
+        await this.deleteProductMedia(productId, oldImageId);
       } catch (error) {
         console.warn(`Failed to delete old image ${oldImageId}:`, error);
         // Continue with adding new image even if deletion fails
@@ -487,9 +493,9 @@ export class ShopifyService {
     try {
       console.log('Starting replaceVariantImage:', { variantId, productId, existingImageId });
       
-      // Step 1: Create a new product image (this attaches it to the product automatically)
-      const newImage = await this.createProductImage(productId, newImageUrl, altText);
-      console.log('Created new product image:', newImage.id);
+      // Step 1: Create a new product media (this attaches it to the product automatically)
+      const newImage = await this.createProductMediaFromUrl(productId, newImageUrl, altText);
+      console.log('Created new product media:', newImage.id);
       
       // Step 2: Try to update the variant to use the new image
       const variantUpdated = await this.updateProductVariantImage(variantId, newImage.id);
@@ -502,7 +508,7 @@ export class ShopifyService {
       // Step 3: Delete the old image if provided and different from new one
       if (existingImageId && existingImageId !== 'null' && existingImageId !== '' && existingImageId !== newImage.id) {
         try {
-          await this.deleteProductImage(productId, existingImageId);
+          await this.deleteProductMedia(productId, existingImageId);
           console.log(`Successfully deleted old product image: ${existingImageId}`);
         } catch (deleteError) {
           console.warn(`Failed to delete old image ${existingImageId}:`, deleteError);
@@ -573,12 +579,12 @@ export class ShopifyService {
     return true;
   }
 
-  async deleteProductImage(productId: string, imageId: string): Promise<boolean> {
+  async deleteProductMedia(productId: string, mediaId: string): Promise<boolean> {
     const query = `
-      mutation productImageDelete($productId: ID!, $id: ID!) {
-        productImageDelete(productId: $productId, id: $id) {
-          deletedImageId
-          userErrors {
+      mutation productDeleteMedia($productId: ID!, $mediaIds: [ID!]!) {
+        productDeleteMedia(productId: $productId, mediaIds: $mediaIds) {
+          deletedMediaIds
+          mediaUserErrors {
             field
             message
           }
@@ -588,13 +594,13 @@ export class ShopifyService {
 
     const data = await this.graphqlRequest(query, {
       productId: productId,
-      id: imageId
+      mediaIds: [mediaId]
     });
 
-    if (data.productImageDelete.userErrors?.length > 0) {
-      throw new Error(`Image deletion error: ${data.productImageDelete.userErrors[0].message}`);
+    if (data.productDeleteMedia.mediaUserErrors?.length > 0) {
+      throw new Error(`Media deletion error: ${data.productDeleteMedia.mediaUserErrors[0].message}`);
     }
 
-    return data.productImageDelete.deletedImageId === imageId;
+    return data.productDeleteMedia.deletedMediaIds.includes(mediaId);
   }
 }
