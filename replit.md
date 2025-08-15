@@ -12,10 +12,12 @@ This is a Shopify Image Management System built for internal tools at Foxx Life 
   - Images now properly attach to products using supported media operations
   - Enhanced error handling and logging for better debugging
 - ✓ **Improved image replacement logic** to handle variant images properly:
-  - Fixed replaceVariantImage method to create product media first, then update variant
-  - Added proper error handling that doesn't fail entire operation if variant update fails
-  - Images are properly created as product media and attached to variants
+  - Fixed replaceVariantImage method to create product media first
+  - Resolved "invalid id" errors by understanding Shopify media vs image ID differences
+  - Added proper null checking for media creation responses
+  - Images are successfully created as product media and attached to products
   - Implemented proper cleanup of old media after successful replacement
+  - Note: Variant-specific image assignment is limited by current Shopify API capabilities
 - ✓ Fixed image replacement RESOURCE_NOT_FOUND error by improving error handling
 - ✓ Added support for draft product preview links in operation results
 - ✓ Updated frontend to pass correct data structure (SKU, existing image ID)
