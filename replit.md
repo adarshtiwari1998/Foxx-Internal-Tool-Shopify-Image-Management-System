@@ -3,9 +3,17 @@
 This is a Shopify Image Management System built for internal tools at Foxx Life Sciences. The application allows users to manage product images across multiple Shopify stores, supporting operations like image replacement, addition, and updates. It provides a comprehensive interface for searching products by SKU or URL, uploading images, and tracking operation results.
 
 ## Recent Changes (August 15, 2025)
-- ✓ Successfully migrated from Replit Agent to standard Replit environment
+- ✓ **Successfully completed migration from Replit Agent to standard Replit environment**
+- ✓ **Fixed critical image replacement errors** by restructuring Shopify API calls:
+  - Replaced problematic productUpdate media mutation with productImageCreate
+  - Improved error handling in image replacement workflow
+  - Added proper image deletion using productImageDelete mutation
+  - Enhanced frontend error handling with better error messages
+- ✓ **Improved image replacement logic** to handle variant images properly:
+  - Fixed replaceVariantImage method to create image first, then update variant
+  - Added fallback handling for variant image updates
+  - Implemented proper cleanup of old images after successful replacement
 - ✓ Fixed image replacement RESOURCE_NOT_FOUND error by improving error handling
-- ✓ Enhanced image replacement logic to handle variant images properly
 - ✓ Added support for draft product preview links in operation results
 - ✓ Updated frontend to pass correct data structure (SKU, existing image ID)
 - ✓ Improved Store Configuration UI with collapsible design to save space

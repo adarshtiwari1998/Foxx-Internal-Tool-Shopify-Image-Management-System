@@ -165,8 +165,24 @@ export default function UnifiedImageWorkflow() {
   // Main image operation functionality
   const imageOperationMutation = useMutation({
     mutationFn: async (operationData: any) => {
-      const response = await apiRequest('POST', '/api/products/update-image', operationData);
-      return response.json();
+      try {
+        const response = await apiRequest('POST', '/api/products/update-image', operationData);
+        if (!response.ok) {
+          const errorData = await response.text();
+          let errorMessage = 'Failed to perform image operation';
+          try {
+            const parsed = JSON.parse(errorData);
+            errorMessage = parsed.message || errorMessage;
+          } catch {
+            errorMessage = errorData || errorMessage;
+          }
+          throw new Error(errorMessage);
+        }
+        return response.json();
+      } catch (error) {
+        console.error('Image operation error:', error);
+        throw error;
+      }
     },
     onSuccess: (data: ImageOperationResult) => {
       setOperationResult(data);
@@ -183,6 +199,7 @@ export default function UnifiedImageWorkflow() {
       });
     },
     onError: (error: any) => {
+      console.error('Image operation failed:', error);
       toast({
         title: "Operation Failed",
         description: error.message || "Failed to perform image operation",

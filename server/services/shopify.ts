@@ -311,22 +311,17 @@ export class ShopifyService {
   }
 
   async addImageToProduct(productId: string, imageUrl: string, altText?: string): Promise<ShopifyImage> {
+    // First create the image file
+    const imageFile = await this.uploadImage(imageUrl, altText);
+    
+    // Then create a product image using the legacy REST-style mutation
     const query = `
-      mutation productUpdate($product: ProductUpdateInput!, $media: [CreateMediaInput!]!) {
-        productUpdate(product: $product, media: $media) {
-          product {
+      mutation productImageCreate($productImage: ProductImageCreateInput!) {
+        productImageCreate(productImage: $productImage) {
+          image {
             id
-            media(first: 1) {
-              nodes {
-                ... on MediaImage {
-                  id
-                  image {
-                    url
-                  }
-                  alt
-                }
-              }
-            }
+            url
+            altText
           }
           userErrors {
             field
@@ -337,27 +332,21 @@ export class ShopifyService {
     `;
 
     const data = await this.graphqlRequest(query, {
-      product: {
-        id: productId,
-      },
-      media: [{
-        originalSource: imageUrl,
-        alt: altText || '',
-        mediaContentType: "IMAGE"
-      }]
+      productImage: {
+        productId: productId,
+        src: imageFile.url,
+        altText: altText || '',
+      }
     });
 
-    if (data.productUpdate.userErrors?.length > 0) {
-      throw new Error(`Image creation error: ${data.productUpdate.userErrors[0].message}`);
+    if (data.productImageCreate.userErrors?.length > 0) {
+      throw new Error(`Image creation error: ${data.productImageCreate.userErrors[0].message}`);
     }
 
-    // Get the newly added media
-    const newMedia = data.productUpdate.product.media.nodes[0];
-    
     return {
-      id: newMedia.id,
-      url: newMedia.image.url,
-      altText: newMedia.alt,
+      id: data.productImageCreate.image.id,
+      url: data.productImageCreate.image.url,
+      altText: data.productImageCreate.image.altText,
     };
   }
 
@@ -509,19 +498,32 @@ export class ShopifyService {
 
   async replaceVariantImage(variantId: string, productId: string, newImageUrl: string, altText?: string, existingImageId?: string): Promise<ShopifyImage> {
     try {
-      // Step 1: Delete the existing image if provided (for replace operations)
-      if (existingImageId && existingImageId !== 'null' && existingImageId !== '') {
-        try {
-          await this.deleteFile(existingImageId);
-          console.log(`Successfully deleted existing image: ${existingImageId}`);
-        } catch (error) {
-          console.warn(`Failed to delete existing image ${existingImageId}:`, error);
-          // Continue with adding new image even if deletion fails
-        }
+      console.log('Starting replaceVariantImage:', { variantId, productId, existingImageId });
+      
+      // Step 1: Create the new image first
+      const newImage = await this.addImageToProduct(productId, newImageUrl, altText);
+      console.log('Created new image:', newImage.id);
+      
+      // Step 2: Update the variant to use the new image
+      try {
+        await this.updateProductVariantImage(variantId, newImage.id);
+        console.log('Updated variant image successfully');
+      } catch (error) {
+        console.warn('Failed to update variant image, but new image was created:', error);
+        // Don't fail the entire operation if variant update fails
       }
       
-      // Step 2: Add the new image to the product (not variant-specific)
-      const newImage = await this.addImageToProduct(productId, newImageUrl, altText);
+      // Step 3: Delete the old image if provided (after successful replacement)
+      if (existingImageId && existingImageId !== 'null' && existingImageId !== '' && existingImageId !== newImage.id) {
+        try {
+          // Use a different deletion method for product images
+          await this.deleteProductImage(productId, existingImageId);
+          console.log(`Successfully deleted old image: ${existingImageId}`);
+        } catch (error) {
+          console.warn(`Failed to delete old image ${existingImageId}:`, error);
+          // Don't fail the operation if deletion fails
+        }
+      }
       
       return newImage;
     } catch (error) {
@@ -584,5 +586,30 @@ export class ShopifyService {
     }
 
     return true;
+  }
+
+  async deleteProductImage(productId: string, imageId: string): Promise<boolean> {
+    const query = `
+      mutation productImageDelete($productId: ID!, $id: ID!) {
+        productImageDelete(productId: $productId, id: $id) {
+          deletedImageId
+          userErrors {
+            field
+            message
+          }
+        }
+      }
+    `;
+
+    const data = await this.graphqlRequest(query, {
+      productId: productId,
+      id: imageId
+    });
+
+    if (data.productImageDelete.userErrors?.length > 0) {
+      throw new Error(`Image deletion error: ${data.productImageDelete.userErrors[0].message}`);
+    }
+
+    return data.productImageDelete.deletedImageId === imageId;
   }
 }
