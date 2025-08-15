@@ -171,15 +171,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         let result;
         
+        console.log('Processing image operation:', {
+          operationType: data.operationType,
+          productId: data.productId,
+          variantId: data.variantId,
+          imageUrl: data.imageUrl.substring(0, 50) + '...',
+          sku: data.sku
+        });
+
         if (data.operationType === 'add' && data.productId) {
           // Add new image to product
+          console.log('Adding new image to product:', data.productId);
           result = await shopify.addImageToProduct(data.productId, data.imageUrl, data.altText);
         } else if (data.operationType === 'replace') {
           // For replace operation, use the new method that handles variant images properly
+          console.log('Replacing variant image for:', data.variantId);
           if (data.productId) {
             result = await shopify.replaceVariantImage(data.variantId, data.productId, data.imageUrl, data.altText);
           } else {
             // Fallback: create new image and update variant
+            console.log('Fallback: uploading image and updating variant');
             const uploadedImage = await shopify.uploadImage(data.imageUrl, data.altText);
             await shopify.updateProductVariantImage(data.variantId, uploadedImage.id);
             result = uploadedImage;
@@ -228,6 +239,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
 
       } catch (shopifyError: any) {
+        console.error('Shopify operation error:', {
+          message: shopifyError.message,
+          operationType: data.operationType,
+          variantId: data.variantId,
+          productId: data.productId,
+          error: shopifyError.toString()
+        });
+        
         // Update operation as failed
         await storage.updateProductOperation(operation.id, {
           status: 'error',
@@ -238,6 +257,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
     } catch (error: any) {
+      console.error('Route error:', error);
       res.status(500).json({ 
         message: error.message || "Failed to update product image",
         error: error.toString()

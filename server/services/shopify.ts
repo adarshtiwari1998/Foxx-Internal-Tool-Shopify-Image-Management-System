@@ -239,8 +239,13 @@ export class ShopifyService {
           files {
             id
             fileStatus
-            ... on GenericFile {
-              url
+            alt
+            ... on MediaImage {
+              image {
+                url
+                width
+                height
+              }
             }
           }
           userErrors {
@@ -254,7 +259,8 @@ export class ShopifyService {
     const data = await this.graphqlRequest(query, {
       files: [{
         originalSource: imageUrl,
-        altText: altText || '',
+        alt: altText || '',
+        contentType: "IMAGE"
       }],
     });
 
@@ -265,8 +271,8 @@ export class ShopifyService {
     const file = data.fileCreate.files[0];
     return {
       id: file.id,
-      url: file.url,
-      altText: altText,
+      url: file.image?.url || imageUrl,
+      altText: file.alt || altText,
     };
   }
 
@@ -483,13 +489,50 @@ export class ShopifyService {
   }
 
   async replaceVariantImage(variantId: string, productId: string, newImageUrl: string, altText?: string): Promise<ShopifyImage> {
-    // Create file from URL first
-    const uploadedImage = await this.uploadImage(newImageUrl, altText);
-    
-    // Update the variant to use this image
-    await this.updateProductVariantImage(variantId, uploadedImage.id);
-    
-    return uploadedImage;
+    try {
+      // Step 1: Create/upload the new image file
+      const uploadedImage = await this.uploadImage(newImageUrl, altText);
+      
+      // Step 2: Update the variant to use this new image
+      const updateQuery = `
+        mutation productVariantUpdate($input: ProductVariantInput!) {
+          productVariantUpdate(input: $input) {
+            productVariant {
+              id
+              image {
+                id
+                url
+                altText
+              }
+            }
+            userErrors {
+              field
+              message
+            }
+          }
+        }
+      `;
+
+      const updateData = await this.graphqlRequest(updateQuery, {
+        input: {
+          id: variantId,
+          imageId: uploadedImage.id,
+        },
+      });
+
+      if (updateData.productVariantUpdate.userErrors?.length > 0) {
+        throw new Error(`Variant image update error: ${updateData.productVariantUpdate.userErrors[0].message}`);
+      }
+
+      return {
+        id: uploadedImage.id,
+        url: uploadedImage.url,
+        altText: altText,
+      };
+    } catch (error) {
+      console.error('Error in replaceVariantImage:', error);
+      throw error;
+    }
   }
 
   async getProductImages(productId: string): Promise<ShopifyImage[]> {
