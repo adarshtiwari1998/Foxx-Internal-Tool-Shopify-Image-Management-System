@@ -681,23 +681,48 @@ export class ShopifyService {
         try {
           let sharpImage = sharp(imageBuffer);
           
+          // Get image metadata to understand original quality
+          const metadata = await sharpImage.metadata();
+          console.log(`📏 Original image: ${metadata.width}x${metadata.height} at ${metadata.density || 'unknown'} DPI`);
+          
           // Set DPI for high-quality ecommerce images (default 300 DPI for print quality)
           const targetDpi = dpi || 300; // Default to 300 DPI for high-quality ecommerce images
           console.log(`Setting image DPI to ${targetDpi} for high-quality output...`);
           
-          // Apply dimension resizing if provided
+          // Smart resizing: preserve quality by avoiding unnecessary resizing
+          let shouldResize = false;
+          let targetWidth = metadata.width;
+          let targetHeight = metadata.height;
+          
           if (dimensions && dimensions.width && dimensions.height) {
-            console.log(`Resizing image to ${dimensions.width}x${dimensions.height} pixels at ${targetDpi} DPI...`);
-            sharpImage = sharpImage.resize(dimensions.width, dimensions.height, {
-              fit: 'cover', // Ensures the image fills the entire space
-              position: 'center' // Centers the crop
-            });
+            // User specifically requested dimensions
+            shouldResize = true;
+            targetWidth = dimensions.width;
+            targetHeight = dimensions.height;
+            console.log(`📐 User requested resize to ${dimensions.width}x${dimensions.height} pixels...`);
+          } else if (metadata.width && metadata.height && (metadata.width > 1200 || metadata.height > 1200)) {
+            // Only auto-resize if image is significantly large to preserve bandwidth
+            shouldResize = true;
+            const aspectRatio = metadata.width / metadata.height;
+            if (aspectRatio > 1) {
+              targetWidth = 1200;
+              targetHeight = Math.round(1200 / aspectRatio);
+            } else {
+              targetHeight = 1200;
+              targetWidth = Math.round(1200 * aspectRatio);
+            }
+            console.log(`📦 Auto-resizing large image from ${metadata.width}x${metadata.height} to ${targetWidth}x${targetHeight} for optimization...`);
           } else {
-            // Apply default 640x640 resizing if no dimensions provided
-            console.log(`Resizing image to default 640x640 pixels at ${targetDpi} DPI...`);
-            sharpImage = sharpImage.resize(640, 640, {
-              fit: 'cover',
-              position: 'center'
+            console.log(`🎯 Preserving original dimensions ${metadata.width}x${metadata.height} for maximum quality!`);
+          }
+          
+          // Apply high-quality resizing only if needed
+          if (shouldResize && targetWidth && targetHeight) {
+            sharpImage = sharpImage.resize(targetWidth, targetHeight, {
+              fit: 'inside', // Preserve aspect ratio without cropping
+              position: 'center',
+              kernel: sharp.kernel.lanczos3, // Highest quality resampling algorithm
+              withoutEnlargement: true // Never make images larger than original
             });
           }
           
