@@ -520,20 +520,25 @@ export default function UnifiedImageWorkflow() {
 
             {/* Image Extension Selection */}
             <div className="space-y-3">
-              <Label>🖼️ What type of image files do you want?</Label>
+              <Label>🖼️ Output Image Format</Label>
               <Select value={fileExtension} onValueChange={(value: any) => setFileExtension(value)}>
-                <SelectTrigger>
+                <SelectTrigger className="border-2 border-blue-200 bg-blue-50">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="png">📷 PNG - Best quality (recommended)</SelectItem>
-                  <SelectItem value="jpeg">🎨 JPEG - Smaller files</SelectItem>
-                  <SelectItem value="webp">✨ WebP - Super small & fast</SelectItem>
+                  <SelectItem value="png">📷 PNG - Maximum Quality (recommended for products)</SelectItem>
+                  <SelectItem value="jpeg">🎨 JPEG - Good balance of quality & size</SelectItem>
+                  <SelectItem value="webp">✨ WebP - Modern format with efficiency</SelectItem>
                 </SelectContent>
               </Select>
-              <p className="text-sm text-muted-foreground">
-                PNG is best for crisp pictures. JPEG makes smaller files. WebP loads fastest!
-              </p>
+              <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <p className="text-sm font-medium text-yellow-800">
+                  ✅ Selected: <strong>{fileExtension.toUpperCase()}</strong> format will be used for Shopify upload
+                </p>
+                <p className="text-xs text-yellow-700 mt-1">
+                  PNG: Lossless quality, perfect for text and product details | JPEG: Balanced | WebP: Modern browser support
+                </p>
+              </div>
             </div>
 
             {/* Dimension Selection */}

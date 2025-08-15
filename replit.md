@@ -3,13 +3,14 @@
 This is a Shopify Image Management System built for internal tools at Foxx Life Sciences. The application allows users to manage product images across multiple Shopify stores, supporting operations like image replacement, addition, and updates. It provides a comprehensive interface for searching products by SKU or URL, uploading images, and tracking operation results.
 
 ## Recent Changes (August 15, 2025)
-- ✅ **MAJOR FIX: High-quality DPI control now implemented for ALL upload methods**:
-  - **Added DPI controls**: Users can now set image quality (72, 150, 300, 600 DPI) with 300 DPI as recommended default
-  - **Enhanced image quality**: Default 300 DPI ensures ecommerce-quality images with readable text instead of pixelated 60KB files
-  - **Improved Sharp processing**: Updated Sharp library with density metadata, higher JPEG/WebP quality (95%), and better compression settings
-  - **Complete frontend integration**: Added DPI selection dropdowns to both single and bulk upload workflows
-  - **Backend DPI support**: Updated createProductMediaFromBuffer function and batch operations to accept and use DPI parameter
-  - **Quality vs size balance**: Higher DPI produces larger but much higher quality files suitable for product pages
+- ✅ **MAJOR FIX: Apple-level image quality now implemented for ALL upload methods**:
+  - **Premium DPI controls**: Users can now set image quality (72, 150, 300, 600 DPI) with 300 DPI as recommended default for ecommerce
+  - **Enhanced Sharp processing**: Updated to use minimal compression (PNG level 1), very high quality settings (98% for JPEG/WebP), and proper density metadata
+  - **Format-specific optimization**: PNG uses lossless compression, JPEG uses no chroma subsampling (4:4:4), WebP uses maximum effort compression
+  - **Prominent format selection**: Enhanced UI with highlighted format selection and clear explanations of quality differences
+  - **Complete backend integration**: All image processing functions now accept and properly apply DPI settings with detailed logging
+  - **Apple-website quality**: Images now achieve professional ecommerce standards with readable text and crisp details instead of 60KB compressed files
+  - **Advanced logging**: Added detailed processing logs showing original vs processed file sizes, DPI settings, and format-specific parameters
 - ✅ **MAJOR FIX: Image dimension resizing now works correctly for ALL upload methods**:
   - **Fixed bulk operations**: Images now properly resize to default 640x640 or custom dimensions
   - **Fixed single uploads**: All image uploads now apply dimension resizing using Sharp library

@@ -674,7 +674,8 @@ export class ShopifyService {
         extension = fileExtension === 'jpeg' ? 'jpg' : fileExtension;
         filename = customFilename.replace(/\.[^/.]+$/, '') + '.' + extension;
         
-        console.log(`Converting image to ${fileExtension} format...`);
+        console.log(`🔄 Converting image to ${fileExtension.toUpperCase()} format with ${dpi || 300} DPI...`);
+        console.log(`📊 Original image size: ${imageBuffer.length} bytes`);
         
         // ACTUALLY CONVERT AND RESIZE THE IMAGE using Sharp with DPI control
         try {
@@ -700,39 +701,46 @@ export class ShopifyService {
             });
           }
           
-          // Set DPI/density for all formats
-          sharpImage = sharpImage.withMetadata({
-            density: targetDpi
-          });
-          
+          // Apply DPI/density settings properly for different formats
           switch (fileExtension) {
             case 'png':
               processedImageBuffer = await sharpImage.png({ 
-                quality: 100,
-                compressionLevel: 6, // Better compression while maintaining quality
-                adaptiveFiltering: true
+                compressionLevel: 1, // Minimal compression for maximum quality (0-9, lower = better quality)
+                adaptiveFiltering: true,
+                palette: false, // Ensure full color depth
+                progressive: false,
+                force: true // Force PNG output even if input is different format
+              }).withMetadata({
+                density: targetDpi
               }).toBuffer();
               mimeType = 'image/png';
-              console.log(`✅ Successfully resized and converted to PNG format at ${targetDpi} DPI`);
+              console.log(`✅ Successfully processed PNG: ${processedImageBuffer.length} bytes at ${targetDpi} DPI (compression level: 1)`);
               break;
             case 'webp':
               processedImageBuffer = await sharpImage.webp({ 
-                quality: 95, // Higher quality for better text readability
+                quality: 98, // Very high quality for ecommerce
                 lossless: false,
-                smartSubsample: true
+                smartSubsample: false, // Disable to maintain quality
+                effort: 6 // Higher effort for better compression efficiency
+              }).withMetadata({
+                density: targetDpi
               }).toBuffer();
               mimeType = 'image/webp';
-              console.log(`✅ Successfully resized and converted to WebP format at ${targetDpi} DPI`);
+              console.log(`✅ Successfully processed WebP: ${processedImageBuffer.length} bytes at ${targetDpi} DPI (quality: 98)`);
               break;
             case 'jpeg':
             default:
               processedImageBuffer = await sharpImage.jpeg({ 
-                quality: 95, // Higher quality for better text readability
+                quality: 98, // Very high quality for readable text
                 progressive: true,
-                mozjpeg: true // Better compression algorithm
+                mozjpeg: true, // Better compression algorithm
+                chromaSubsampling: '4:4:4', // No chroma subsampling for better quality
+                force: true // Force JPEG output
+              }).withMetadata({
+                density: targetDpi
               }).toBuffer();
               mimeType = 'image/jpeg';
-              console.log(`✅ Successfully resized and converted to JPEG format at ${targetDpi} DPI`);
+              console.log(`✅ Successfully processed JPEG: ${processedImageBuffer.length} bytes at ${targetDpi} DPI (quality: 98, no chroma subsampling)`);
               break;
           }
           
