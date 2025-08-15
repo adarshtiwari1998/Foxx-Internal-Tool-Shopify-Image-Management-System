@@ -91,7 +91,8 @@ export default function BulkSkuWorkflow() {
   const [isPreviewingZip, setIsPreviewingZip] = useState(false);
 
   // Dimension state
-  const [imageDimensions, setImageDimensions] = useState({ width: '640', height: '640' }); // Default 640x640
+  const [imageDimensions, setImageDimensions] = useState({ width: '640', height: '640' });
+  const [imageDpi, setImageDpi] = useState(300); // Default 300 DPI for high-quality ecommerce images
   const [useCustomDimensions, setUseCustomDimensions] = useState(false);
 
   // Progress state
@@ -407,12 +408,16 @@ export default function BulkSkuWorkflow() {
       individualFiles: Object.keys(individualFiles).length > 0 ? individualFiles : undefined,
       altText: altText || undefined,
       fileExtension: fileExtension,
-      ...(useCustomDimensions && imageDimensions.width && imageDimensions.height && {
-        dimensions: {
-          width: parseInt(imageDimensions.width),
-          height: parseInt(imageDimensions.height)
-        }
-      }),
+      dimensions: useCustomDimensions && imageDimensions.width && imageDimensions.height 
+        ? {
+            width: parseInt(imageDimensions.width),
+            height: parseInt(imageDimensions.height)
+          }
+        : {
+            width: 640,
+            height: 640
+          },
+      dpi: imageDpi,
     };
 
     batchOperationMutation.mutate(operationData);
@@ -1094,7 +1099,7 @@ export default function BulkSkuWorkflow() {
               {!useCustomDimensions && (
                 <div className="p-3 bg-gray-50 dark:bg-gray-900 rounded-lg border">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">Default: 640 × 640 pixels</span>
+                    <span className="text-sm font-medium">Default: 640 × 640 pixels @ 300 DPI</span>
                     <Button
                       variant="outline"
                       size="sm"
@@ -1155,6 +1160,57 @@ export default function BulkSkuWorkflow() {
                         </SelectContent>
                       </Select>
                     </div>
+                  </div>
+                  
+                  {/* DPI/Quality Settings */}
+                  <div className="space-y-3 pt-4 border-t">
+                    <Label>Image Quality (DPI)</Label>
+                    <div className="space-y-2">
+                      <Label htmlFor="dpi" className="text-sm">Resolution Quality</Label>
+                      <Select 
+                        value={imageDpi.toString()} 
+                        onValueChange={(value) => setImageDpi(parseInt(value))}
+                      >
+                        <SelectTrigger data-testid="select-image-dpi">
+                          <SelectValue placeholder="Select DPI" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="72">72 DPI (Web)</SelectItem>
+                          <SelectItem value="150">150 DPI (Medium)</SelectItem>
+                          <SelectItem value="300">300 DPI (High Quality - Recommended)</SelectItem>
+                          <SelectItem value="600">600 DPI (Print Quality)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground">
+                        Higher DPI = Better quality but larger file size. 300 DPI is recommended for ecommerce product images.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {/* DPI Settings for Default Dimensions */}
+              {!useCustomDimensions && (
+                <div className="space-y-3">
+                  <Label>Image Quality (DPI)</Label>
+                  <div className="space-y-2">
+                    <Select 
+                      value={imageDpi.toString()} 
+                      onValueChange={(value) => setImageDpi(parseInt(value))}
+                    >
+                      <SelectTrigger data-testid="select-image-dpi-default">
+                        <SelectValue placeholder="Select DPI" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="72">72 DPI (Web)</SelectItem>
+                        <SelectItem value="150">150 DPI (Medium)</SelectItem>
+                        <SelectItem value="300">300 DPI (High Quality - Recommended)</SelectItem>
+                        <SelectItem value="600">600 DPI (Print Quality)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Higher DPI = Better quality but larger file size. 300 DPI is recommended for ecommerce product images.
+                    </p>
                   </div>
                 </div>
               )}

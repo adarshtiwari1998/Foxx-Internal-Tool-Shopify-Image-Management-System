@@ -60,6 +60,7 @@ export default function UnifiedImageWorkflow() {
   
   // Dimension state - default to 640x640
   const [imageDimensions, setImageDimensions] = useState({ width: '640', height: '640' });
+  const [imageDpi, setImageDpi] = useState(300); // Default 300 DPI for high-quality ecommerce images
   const [useCustomDimensions, setUseCustomDimensions] = useState(false);
 
   // Results state
@@ -552,9 +553,36 @@ export default function UnifiedImageWorkflow() {
                   </div>
                   {!useCustomDimensions && (
                     <div className="text-sm text-gray-600 bg-gray-50 px-3 py-1 rounded">
-                      Default: 640×640px
+                      Default: 640×640px @ 300 DPI
                     </div>
                   )}
+                </div>
+                
+                {/* DPI/Quality Settings */}
+                <div className="space-y-3">
+                  <Label>Image Quality (DPI)</Label>
+                  <div className="grid grid-cols-1 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="dpi" className="text-sm">Resolution Quality</Label>
+                      <Select 
+                        value={imageDpi.toString()} 
+                        onValueChange={(value) => setImageDpi(parseInt(value))}
+                      >
+                        <SelectTrigger data-testid="select-image-dpi">
+                          <SelectValue placeholder="Select DPI" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="72">72 DPI (Web)</SelectItem>
+                          <SelectItem value="150">150 DPI (Medium)</SelectItem>
+                          <SelectItem value="300">300 DPI (High Quality - Recommended)</SelectItem>
+                          <SelectItem value="600">600 DPI (Print Quality)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground">
+                        Higher DPI = Better quality but larger file size. 300 DPI is recommended for ecommerce product images.
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </div>
               

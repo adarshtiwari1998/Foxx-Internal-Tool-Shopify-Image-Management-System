@@ -670,6 +670,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const uploadMethod = req.body.uploadMethod;
       const altText = req.body.altText || '';
       const dimensions = req.body.dimensions ? JSON.parse(req.body.dimensions) : undefined;
+      const dpi = req.body.dpi ? parseInt(req.body.dpi) : 300; // Default 300 DPI for high-quality ecommerce images
       const fileExtension = req.body.fileExtension || 'png'; // Default to PNG if not specified
       
       // Parse uploaded files - fix for upload.any() format
@@ -811,7 +812,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Start async processing
-      processBatchOperations(batch.id, skus, imageFiles, operationType, uploadMethod, altText, dimensions, activeStore, fileExtension);
+      processBatchOperations(batch.id, skus, imageFiles, operationType, uploadMethod, altText, dimensions, activeStore, fileExtension, dpi);
 
       res.json(batch);
     } catch (error: any) {
@@ -961,7 +962,8 @@ async function processBatchOperations(
   altText: string,
   dimensions: any,
   activeStore: any,
-  fileExtension: string = 'png'
+  fileExtension: string = 'png',
+  dpi: number = 300
 ) {
   try {
     await storage.updateBatchOperation(batchId, { status: 'processing' });
@@ -1101,7 +1103,8 @@ async function processBatchOperations(
               altTextToUse,
               generateBulkImageFilename(sku, productVariant.product.title, dimensions, fileExtension),
               fileExtension,
-              dimensions
+              dimensions,
+              dpi // Use DPI from request or 300 DPI default
             );
             
           } else if (operationType === 'add' && productVariant) {
@@ -1112,7 +1115,8 @@ async function processBatchOperations(
               altTextToUse,
               generateBulkImageFilename(sku, productVariant.product.title, dimensions, fileExtension),
               fileExtension,
-              dimensions
+              dimensions,
+              dpi // Use DPI from request or 300 DPI default
             );
           }
           

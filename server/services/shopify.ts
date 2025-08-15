@@ -659,7 +659,7 @@ export class ShopifyService {
   }
 
   // Direct method to create product media from buffer for bulk operations
-  async createProductMediaFromBuffer(productId: string, imageBuffer: Buffer, altText?: string, customFilename?: string, fileExtension?: string, dimensions?: { width: number; height: number }): Promise<ShopifyImage> {
+  async createProductMediaFromBuffer(productId: string, imageBuffer: Buffer, altText?: string, customFilename?: string, fileExtension?: string, dimensions?: { width: number; height: number }, dpi?: number): Promise<ShopifyImage> {
     try {
       console.log(`Creating product media from buffer (${imageBuffer.length} bytes) for product: ${productId}`);
       
@@ -676,49 +676,70 @@ export class ShopifyService {
         
         console.log(`Converting image to ${fileExtension} format...`);
         
-        // ACTUALLY CONVERT AND RESIZE THE IMAGE using Sharp
+        // ACTUALLY CONVERT AND RESIZE THE IMAGE using Sharp with DPI control
         try {
           let sharpImage = sharp(imageBuffer);
           
+          // Set DPI for high-quality ecommerce images (default 300 DPI for print quality)
+          const targetDpi = dpi || 300; // Default to 300 DPI for high-quality ecommerce images
+          console.log(`Setting image DPI to ${targetDpi} for high-quality output...`);
+          
           // Apply dimension resizing if provided
           if (dimensions && dimensions.width && dimensions.height) {
-            console.log(`Resizing image to ${dimensions.width}x${dimensions.height} pixels...`);
+            console.log(`Resizing image to ${dimensions.width}x${dimensions.height} pixels at ${targetDpi} DPI...`);
             sharpImage = sharpImage.resize(dimensions.width, dimensions.height, {
               fit: 'cover', // Ensures the image fills the entire space
               position: 'center' // Centers the crop
             });
           } else {
             // Apply default 640x640 resizing if no dimensions provided
-            console.log(`Resizing image to default 640x640 pixels...`);
+            console.log(`Resizing image to default 640x640 pixels at ${targetDpi} DPI...`);
             sharpImage = sharpImage.resize(640, 640, {
               fit: 'cover',
               position: 'center'
             });
           }
           
+          // Set DPI/density for all formats
+          sharpImage = sharpImage.withMetadata({
+            density: targetDpi
+          });
+          
           switch (fileExtension) {
             case 'png':
-              processedImageBuffer = await sharpImage.png({ quality: 100 }).toBuffer();
+              processedImageBuffer = await sharpImage.png({ 
+                quality: 100,
+                compressionLevel: 6, // Better compression while maintaining quality
+                adaptiveFiltering: true
+              }).toBuffer();
               mimeType = 'image/png';
-              console.log(`✅ Successfully resized and converted to PNG format`);
+              console.log(`✅ Successfully resized and converted to PNG format at ${targetDpi} DPI`);
               break;
             case 'webp':
-              processedImageBuffer = await sharpImage.webp({ quality: 90 }).toBuffer();
+              processedImageBuffer = await sharpImage.webp({ 
+                quality: 95, // Higher quality for better text readability
+                lossless: false,
+                smartSubsample: true
+              }).toBuffer();
               mimeType = 'image/webp';
-              console.log(`✅ Successfully resized and converted to WebP format`);
+              console.log(`✅ Successfully resized and converted to WebP format at ${targetDpi} DPI`);
               break;
             case 'jpeg':
             default:
-              processedImageBuffer = await sharpImage.jpeg({ quality: 90 }).toBuffer();
+              processedImageBuffer = await sharpImage.jpeg({ 
+                quality: 95, // Higher quality for better text readability
+                progressive: true,
+                mozjpeg: true // Better compression algorithm
+              }).toBuffer();
               mimeType = 'image/jpeg';
-              console.log(`✅ Successfully resized and converted to JPEG format`);
+              console.log(`✅ Successfully resized and converted to JPEG format at ${targetDpi} DPI`);
               break;
           }
           
           const targetDimensions = dimensions && dimensions.width && dimensions.height 
             ? `${dimensions.width}x${dimensions.height}` 
             : '640x640';
-          console.log(`Image processing complete: ${imageBuffer.length} bytes -> ${processedImageBuffer.length} bytes (resized to ${targetDimensions})`);
+          console.log(`Image processing complete: ${imageBuffer.length} bytes -> ${processedImageBuffer.length} bytes (resized to ${targetDimensions} at ${targetDpi} DPI)`);
         } catch (conversionError) {
           console.error('Image conversion failed, using original buffer:', conversionError);
           // Fall back to original buffer if conversion fails
