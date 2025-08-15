@@ -1,3 +1,5 @@
+import sharp from 'sharp';
+
 interface ShopifyConfig {
   storeUrl: string;
   accessToken: string;
@@ -661,20 +663,9 @@ export class ShopifyService {
     try {
       console.log(`Creating product media from buffer (${imageBuffer.length} bytes) for product: ${productId}`);
       
-      // Determine MIME type based on buffer content
+      // ACTUAL IMAGE FORMAT CONVERSION using Sharp
+      let processedImageBuffer = imageBuffer;
       let mimeType = 'image/jpeg'; // default
-      if (imageBuffer.length > 4) {
-        const header = imageBuffer.toString('hex', 0, 4);
-        if (header.startsWith('89504e47')) {
-          mimeType = 'image/png';
-        } else if (header.startsWith('47494638')) {
-          mimeType = 'image/gif';
-        } else if (header.startsWith('52494646')) {
-          mimeType = 'image/webp';
-        }
-      }
-      
-      // Use custom filename if provided, otherwise create a unique filename
       let filename: string;
       let extension: string;
       
@@ -683,30 +674,48 @@ export class ShopifyService {
         extension = fileExtension === 'jpeg' ? 'jpg' : fileExtension;
         filename = customFilename.replace(/\.[^/.]+$/, '') + '.' + extension;
         
-        // Update MIME type to match requested extension
-        switch (fileExtension) {
-          case 'png':
-            mimeType = 'image/png';
-            break;
-          case 'webp':
-            mimeType = 'image/webp';
-            break;
-          case 'jpeg':
-          default:
-            mimeType = 'image/jpeg';
-            break;
+        console.log(`Converting image to ${fileExtension} format...`);
+        
+        // ACTUALLY CONVERT THE IMAGE using Sharp
+        try {
+          const sharpImage = sharp(imageBuffer);
+          
+          switch (fileExtension) {
+            case 'png':
+              processedImageBuffer = await sharpImage.png({ quality: 100 }).toBuffer();
+              mimeType = 'image/png';
+              console.log(`✅ Successfully converted to PNG format`);
+              break;
+            case 'webp':
+              processedImageBuffer = await sharpImage.webp({ quality: 90 }).toBuffer();
+              mimeType = 'image/webp';
+              console.log(`✅ Successfully converted to WebP format`);
+              break;
+            case 'jpeg':
+            default:
+              processedImageBuffer = await sharpImage.jpeg({ quality: 90 }).toBuffer();
+              mimeType = 'image/jpeg';
+              console.log(`✅ Successfully converted to JPEG format`);
+              break;
+          }
+          
+          console.log(`Image conversion complete: ${imageBuffer.length} bytes -> ${processedImageBuffer.length} bytes`);
+        } catch (conversionError) {
+          console.error('Image conversion failed, using original buffer:', conversionError);
+          // Fall back to original buffer if conversion fails
+          mimeType = fileExtension === 'png' ? 'image/png' : fileExtension === 'webp' ? 'image/webp' : 'image/jpeg';
         }
       } else {
         // Fallback to auto-detection and timestamp-based naming
         const timestamp = Date.now();
-        extension = mimeType.split('/')[1];
+        extension = 'jpg';
         filename = `bulk_upload_${timestamp}.${extension}`;
       }
       
       console.log(`Creating staged upload for: ${filename} (${mimeType})`);
       
-      // Step 1: Create staged upload target
-      const stagedTarget = await this.createStagedUpload(filename, mimeType, imageBuffer.length);
+      // Step 1: Create staged upload target (use processed buffer length)
+      const stagedTarget = await this.createStagedUpload(filename, mimeType, processedImageBuffer.length);
       
       console.log(`Staged upload created, uploading to: ${stagedTarget.url}`);
       
@@ -718,11 +727,11 @@ export class ShopifyService {
         formData.append(param.name, param.value);
       });
       
-      // Create a Blob from the buffer and append as file
-      const blob = new Blob([imageBuffer], { type: mimeType });
+      // Create a Blob from the PROCESSED buffer and append as file
+      const blob = new Blob([processedImageBuffer], { type: mimeType });
       formData.append('file', blob, filename);
       
-      console.log(`Uploading ${imageBuffer.length} bytes to staged target...`);
+      console.log(`Uploading ${processedImageBuffer.length} bytes to staged target...`);
       const uploadResponse = await fetch(stagedTarget.url, {
         method: 'POST',
         body: formData,
