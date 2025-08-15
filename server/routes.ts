@@ -754,45 +754,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const fileBaseName = filename.split('/').pop()?.split('.')[0] || '';
             console.log(`Processing file: "${filename}" -> base: "${fileBaseName}"`);
             
-            // Try multiple matching strategies - ONLY match SKU part, ignore extensions completely
+            // Use the SAME matching logic as ZIP preview
             let matchingSku = skus.find((sku: string) => {
-              const skuClean = sku.toLowerCase().trim();
-              const fileClean = fileBaseName.toLowerCase().trim();
-              
-              console.log(`  Comparing: "${fileClean}" vs SKU "${skuClean}"`);
-              
-              // Exact match (ignore case)
-              if (fileClean === skuClean) {
-                console.log(`    ✓ EXACT MATCH`);
-                return true;
-              }
-              
-              // Remove common separators and match
-              const skuNormalized = skuClean.replace(/[-_\s]/g, '');
-              const fileNormalized = fileClean.replace(/[-_\s]/g, '');
-              if (fileNormalized === skuNormalized) {
-                console.log(`    ✓ NORMALIZED MATCH`);
-                return true;
-              }
-              
-              // Check if filename starts with SKU (good for files like "SKU-001_image1.jpg")
-              if (fileClean.startsWith(skuClean)) {
-                console.log(`    ✓ STARTS WITH MATCH`);
-                return true;
-              }
-              
-              // Check if filename contains the full SKU surrounded by separators or at start/end
-              try {
-                const regex = new RegExp(`(^|[-_\s])${escapeRegex(skuClean)}([-_\s]|$)`, 'i');
-                if (regex.test(fileClean)) {
-                  console.log(`    ✓ REGEX MATCH`);
-                  return true;
-                }
-              } catch (e) {
-                console.warn(`    Regex error for SKU ${skuClean}:`, e);
-              }
-              
-              return false;
+              return matchSkuToFilename(sku, fileBaseName);
             });
             
             if (matchingSku) {
@@ -880,33 +844,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const uncompressedSize = await file.async('uint8array').then(data => data.length);
           const fileBaseName = filename.split('/').pop()?.split('.')[0] || '';
           
-          // Check if this file matches any SKU
+          // Check if this file matches any SKU using the same logic as batch operation
           let matchingSku = null;
           if (skus.length > 0) {
             matchingSku = skus.find((sku: string) => {
-              const skuClean = sku.toLowerCase().trim();
-              const fileClean = fileBaseName.toLowerCase().trim();
-              
-              // Exact match (ignore case)
-              if (fileClean === skuClean) return true;
-              
-              // Remove common separators and match
-              const skuNormalized = skuClean.replace(/[-_\s]/g, '');
-              const fileNormalized = fileClean.replace(/[-_\s]/g, '');
-              if (fileNormalized === skuNormalized) return true;
-              
-              // Check if filename starts with SKU
-              if (fileClean.startsWith(skuClean)) return true;
-              
-              // Regex pattern matching
-              try {
-                const regex = new RegExp(`(^|[-_\s])${escapeRegex(skuClean)}([-_\s]|$)`, 'i');
-                if (regex.test(fileClean)) return true;
-              } catch (e) {
-                // Ignore regex errors
-              }
-              
-              return false;
+              return matchSkuToFilename(sku, fileBaseName);
             });
           }
           
@@ -949,6 +891,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
 // Helper function to escape regex special characters
 function escapeRegex(string: string) {
   return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// Unified SKU matching function used by both ZIP preview and batch operation
+function matchSkuToFilename(sku: string, fileBaseName: string): boolean {
+  const skuClean = sku.toLowerCase().trim();
+  const fileClean = fileBaseName.toLowerCase().trim();
+  
+  console.log(`  Matching: "${fileClean}" vs SKU "${skuClean}"`);
+  
+  // Exact match (ignore case)
+  if (fileClean === skuClean) {
+    console.log(`    ✓ EXACT MATCH`);
+    return true;
+  }
+  
+  // Remove common separators and match
+  const skuNormalized = skuClean.replace(/[-_\s]/g, '');
+  const fileNormalized = fileClean.replace(/[-_\s]/g, '');
+  if (fileNormalized === skuNormalized) {
+    console.log(`    ✓ NORMALIZED MATCH`);
+    return true;
+  }
+  
+  // Check if filename starts with SKU (good for files like "SKU-001_image1.jpg")
+  if (fileClean.startsWith(skuClean)) {
+    console.log(`    ✓ STARTS WITH MATCH`);
+    return true;
+  }
+  
+  // Check if filename contains the full SKU surrounded by separators or at start/end
+  try {
+    const regex = new RegExp(`(^|[-_\s])${escapeRegex(skuClean)}([-_\s]|$)`, 'i');
+    if (regex.test(fileClean)) {
+      console.log(`    ✓ REGEX MATCH`);
+      return true;
+    }
+  } catch (e) {
+    console.warn(`    Regex error for SKU ${skuClean}:`, e);
+  }
+  
+  console.log(`    ✗ NO MATCH`);
+  return false;
 }
 
 // Async batch processing function
