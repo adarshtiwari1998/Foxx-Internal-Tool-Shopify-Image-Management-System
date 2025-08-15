@@ -658,16 +658,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/products/batch-operation", upload.fields([
-    { name: 'singleFile', maxCount: 1 },
-    { name: 'zipFile', maxCount: 1 }
-  ]), async (req: any, res) => {
+  app.post("/api/products/batch-operation", upload.any(), async (req: any, res) => {
     try {
       const skus = JSON.parse(req.body.skus);
       const operationType = req.body.operationType;
       const uploadMethod = req.body.uploadMethod;
       const altText = req.body.altText || '';
       const dimensions = req.body.dimensions ? JSON.parse(req.body.dimensions) : undefined;
+      
+      // Parse uploaded files
+      const singleFile = req.files?.find((f: any) => f.fieldname === 'singleFile');
+      const zipFile = req.files?.find((f: any) => f.fieldname === 'zipFile');
+      
+      // Parse individual files
+      const individualFiles: {[sku: string]: any} = {};
+      if (uploadMethod === 'individual') {
+        req.files?.forEach((file: any) => {
+          if (file.fieldname.startsWith('individualFile_')) {
+            const index = file.fieldname.split('_')[1];
+            const sku = req.body[`individualSku_${index}`];
+            if (sku) {
+              individualFiles[sku] = file;
+            }
+          }
+        });
+      }
 
       const activeStore = await storage.getActiveStore();
       if (!activeStore) {
@@ -692,9 +707,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Process images based on upload method
       let imageFiles: { [sku: string]: Buffer } = {};
 
-      if (uploadMethod === 'zip' && req.files.zipFile) {
+      if (uploadMethod === 'zip' && zipFile) {
         // Extract ZIP file
-        const zipBuffer = req.files.zipFile[0].buffer;
+        const zipBuffer = zipFile.buffer;
         const zip = new JSZip();
         const zipContent = await zip.loadAsync(zipBuffer);
         
@@ -711,11 +726,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           }
         }
-      } else if (uploadMethod === 'single' && req.files.singleFile) {
+      } else if (uploadMethod === 'single' && singleFile) {
         // Use single file for all SKUs
-        const singleFileBuffer = req.files.singleFile[0].buffer;
+        const singleFileBuffer = singleFile.buffer;
         skus.forEach((sku: string) => {
           imageFiles[sku] = singleFileBuffer;
+        });
+      } else if (uploadMethod === 'individual' && Object.keys(individualFiles).length > 0) {
+        // Use individual files for each SKU
+        Object.entries(individualFiles).forEach(([sku, file]) => {
+          imageFiles[sku] = file.buffer;
         });
       }
 
