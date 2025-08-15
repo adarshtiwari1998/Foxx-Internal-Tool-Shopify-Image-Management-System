@@ -210,7 +210,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (productVariant) {
           if (productVariant.product.status === 'DRAFT') {
             try {
-              previewUrl = await shopify.generatePreviewLink(productVariant.product.id);
+              const generatedPreviewUrl = await shopify.generatePreviewLink(productVariant.product.id);
+              previewUrl = generatedPreviewUrl || '';
             } catch (previewError) {
               console.warn('Failed to generate preview link:', previewError);
             }
@@ -503,7 +504,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         if (productVariant) {
           if (productVariant.product.status === 'DRAFT') {
-            previewUrl = await shopify.generatePreviewLink(productVariant.product.id);
+            const generatedPreviewUrl = await shopify.generatePreviewLink(productVariant.product.id);
+            previewUrl = generatedPreviewUrl || '';
           } else {
             liveUrl = shopify.getLiveProductUrl(productVariant.product.handle);
           }
