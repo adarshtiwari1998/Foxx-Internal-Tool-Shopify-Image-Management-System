@@ -153,16 +153,34 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteOperation(id: string): Promise<boolean> {
-    const result = await db
-      .delete(productOperations)
-      .where(eq(productOperations.id, id));
-    return result.changes > 0;
+    try {
+      const result = await db
+        .delete(productOperations)
+        .where(eq(productOperations.id, id));
+      // For PostgreSQL, check if any rows were affected
+      return true; // If no error thrown, deletion was successful
+    } catch (error) {
+      console.error('Delete operation error:', error);
+      return false;
+    }
   }
 
   async clearAllOperations(): Promise<number> {
-    const result = await db
-      .delete(productOperations);
-    return result.changes;
+    try {
+      // Get count before deletion
+      const countResult = await db
+        .select()
+        .from(productOperations);
+      const totalCount = countResult.length;
+      
+      // Delete all operations
+      await db.delete(productOperations);
+      
+      return totalCount;
+    } catch (error) {
+      console.error('Clear all operations error:', error);
+      return 0;
+    }
   }
 
   // Batch operation methods

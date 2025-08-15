@@ -231,20 +231,22 @@ export default function ActionResults() {
                 className={`border rounded-lg p-4 ${getStatusColor(operation.status)}`}
                 data-testid={`operation-${operation.id}`}
               >
-                <div className="flex items-start">
+                <div className="flex items-start gap-3">
                   <Checkbox
                     checked={selectedOperations.has(operation.id)}
                     onCheckedChange={(checked) => handleSelectOperation(operation.id, checked as boolean)}
-                    className="mt-1 mr-3"
+                    className="mt-1 flex-shrink-0"
                     data-testid={`checkbox-operation-${operation.id}`}
                   />
-                  {getStatusIcon(operation.status)}
-                  <div className="flex-1 ml-3">
+                  <div className="flex-shrink-0">
+                    {getStatusIcon(operation.status)}
+                  </div>
+                  <div className="flex-1 min-w-0 overflow-hidden">
                     <div className="flex items-center justify-between">
-                      <h4 className="text-sm font-medium text-gray-900">
+                      <h4 className="text-sm font-medium text-gray-900 flex-1 min-w-0">
                         {operation.operationType === 'replace' ? 'Image Replaced' : 'Image Added'}
                       </h4>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-shrink-0">
                         <Badge variant="outline" className="text-xs">
                           {operation.status}
                         </Badge>
@@ -253,7 +255,7 @@ export default function ActionResults() {
                           size="sm"
                           onClick={() => handleDeleteOperation(operation.id)}
                           disabled={deleteOperationMutation.isPending}
-                          className="h-6 w-6 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
+                          className="h-6 w-6 p-0 text-red-500 hover:text-red-600 hover:bg-red-50 flex-shrink-0"
                           data-testid={`button-delete-${operation.id}`}
                         >
                           <Trash2 className="h-3 w-3" />
