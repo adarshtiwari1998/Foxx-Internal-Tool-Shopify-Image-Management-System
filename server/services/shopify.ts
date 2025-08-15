@@ -278,8 +278,8 @@ export class ShopifyService {
 
   async createProductMediaFromUrl(productId: string, imageUrl: string, altText?: string): Promise<ShopifyImage> {
     const query = `
-      mutation productUpdateMedia($productId: ID!, $media: [UpdateMediaInput!]!) {
-        productUpdateMedia(productId: $productId, media: $media) {
+      mutation productCreateMedia($media: [CreateMediaInput!]!, $productId: ID!) {
+        productCreateMedia(media: $media, productId: $productId) {
           media {
             ... on MediaImage {
               id
@@ -292,6 +292,9 @@ export class ShopifyService {
           mediaUserErrors {
             field
             message
+          }
+          product {
+            id
           }
         }
       }
@@ -306,11 +309,11 @@ export class ShopifyService {
       }]
     });
 
-    if (data.productUpdateMedia.mediaUserErrors?.length > 0) {
-      throw new Error(`Product media creation error: ${data.productUpdateMedia.mediaUserErrors[0].message}`);
+    if (data.productCreateMedia.mediaUserErrors?.length > 0) {
+      throw new Error(`Product media creation error: ${data.productCreateMedia.mediaUserErrors[0].message}`);
     }
 
-    const mediaImage = data.productUpdateMedia.media[0];
+    const mediaImage = data.productCreateMedia.media[0];
     return {
       id: mediaImage.id,
       url: mediaImage.image.url,
