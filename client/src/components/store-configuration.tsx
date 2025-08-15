@@ -85,6 +85,11 @@ export default function StoreConfiguration() {
             <div className="flex items-center">
               <Globe className="mr-2 h-5 w-5 text-foxx-blue" />
               Store Configuration
+              {activeStore && (
+                <span className="ml-3 text-sm font-normal text-gray-600 dark:text-gray-400">
+                  - {activeStore.name}
+                </span>
+              )}
             </div>
             <div className="flex items-center space-x-3">
               <div className="text-sm text-gray-500">
