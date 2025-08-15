@@ -187,7 +187,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // For replace operation, use the new method that handles variant images properly
           console.log('Replacing variant image for:', data.variantId);
           if (data.productId) {
-            result = await shopify.replaceVariantImage(data.variantId, data.productId, data.imageUrl, data.altText);
+            // Pass the existing image ID from the request data if available
+            result = await shopify.replaceVariantImage(data.variantId, data.productId, data.imageUrl, data.altText, data.existingImageId);
           } else {
             // Fallback: create new image and update variant
             console.log('Fallback: uploading image and updating variant');

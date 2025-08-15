@@ -488,47 +488,23 @@ export class ShopifyService {
     return await this.addImageToProduct(productId, newImageUrl, altText);
   }
 
-  async replaceVariantImage(variantId: string, productId: string, newImageUrl: string, altText?: string): Promise<ShopifyImage> {
+  async replaceVariantImage(variantId: string, productId: string, newImageUrl: string, altText?: string, existingImageId?: string): Promise<ShopifyImage> {
     try {
-      // Step 1: Create/upload the new image file
-      const uploadedImage = await this.uploadImage(newImageUrl, altText);
-      
-      // Step 2: Update the variant to use this new image
-      const updateQuery = `
-        mutation productVariantUpdate($input: ProductVariantInput!) {
-          productVariantUpdate(input: $input) {
-            productVariant {
-              id
-              image {
-                id
-                url
-                altText
-              }
-            }
-            userErrors {
-              field
-              message
-            }
-          }
+      // Step 1: Delete the existing image if provided (for replace operations)
+      if (existingImageId && existingImageId !== 'null' && existingImageId !== '') {
+        try {
+          await this.deleteFile(existingImageId);
+          console.log(`Successfully deleted existing image: ${existingImageId}`);
+        } catch (error) {
+          console.warn(`Failed to delete existing image ${existingImageId}:`, error);
+          // Continue with adding new image even if deletion fails
         }
-      `;
-
-      const updateData = await this.graphqlRequest(updateQuery, {
-        input: {
-          id: variantId,
-          imageId: uploadedImage.id,
-        },
-      });
-
-      if (updateData.productVariantUpdate.userErrors?.length > 0) {
-        throw new Error(`Variant image update error: ${updateData.productVariantUpdate.userErrors[0].message}`);
       }
-
-      return {
-        id: uploadedImage.id,
-        url: uploadedImage.url,
-        altText: altText,
-      };
+      
+      // Step 2: Add the new image to the product (not variant-specific)
+      const newImage = await this.addImageToProduct(productId, newImageUrl, altText);
+      
+      return newImage;
     } catch (error) {
       console.error('Error in replaceVariantImage:', error);
       throw error;
