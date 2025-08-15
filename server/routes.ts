@@ -371,6 +371,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         altText: z.string().optional(),
         copyExistingAlt: z.boolean().optional(),
         targetImageId: z.string().optional(), // For replace operations
+        dimensions: z.object({
+          width: z.number(),
+          height: z.number()
+        }).optional(),
+        filename: z.string().optional(),
       });
 
       const data = schema.parse(req.body);
@@ -417,6 +422,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           inputType: data.inputType,
           inputValue: data.inputValue,
           copyExistingAlt: data.copyExistingAlt,
+          dimensions: data.dimensions,
+          filename: data.filename,
         },
       };
 

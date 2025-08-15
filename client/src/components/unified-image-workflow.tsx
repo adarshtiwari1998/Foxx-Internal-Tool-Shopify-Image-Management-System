@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   Search, 
   Upload, 
@@ -55,9 +56,34 @@ export default function UnifiedImageWorkflow() {
   const [copyExistingAlt, setCopyExistingAlt] = useState(true);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>('');
+  
+  // Dimension state
+  const [imageDimensions, setImageDimensions] = useState({ width: '', height: '' });
+  const [useCustomDimensions, setUseCustomDimensions] = useState(false);
 
   // Results state
   const [operationResult, setOperationResult] = useState<ImageOperationResult | null>(null);
+
+  // Generate proper image filename
+  const generateImageFilename = (file?: File) => {
+    if (!productData) return file?.name || 'image';
+    
+    const sku = productData.sku || 'no-sku';
+    const productTitle = productData.product.title
+      .split(' ')
+      .slice(0, 3) // First 3 words of title
+      .join('_')
+      .toLowerCase()
+      .replace(/[^a-z0-9_]/g, '');
+    
+    const dimensions = useCustomDimensions && imageDimensions.width && imageDimensions.height
+      ? `${imageDimensions.width}x${imageDimensions.height}`
+      : 'original';
+    
+    const extension = file?.name.split('.').pop() || 'jpg';
+    
+    return `${sku}_${dimensions}_${productTitle}.${extension}`;
+  };
 
   // Product search functionality
   const searchProductMutation = useMutation({
@@ -92,9 +118,11 @@ export default function UnifiedImageWorkflow() {
   // File upload functionality for staged uploads
   const stagedUploadMutation = useMutation({
     mutationFn: async (file: File) => {
+      const filename = generateImageFilename(file);
+      
       // Step 1: Create staged upload
       const stagedResponse = await apiRequest('POST', '/api/files/staged-upload', {
-        filename: file.name,
+        filename: filename,
         mimeType: file.type,
         fileSize: file.size,
       });
@@ -207,6 +235,13 @@ export default function UnifiedImageWorkflow() {
       altText,
       copyExistingAlt,
       targetImageId: productData?.image?.id,
+      ...(useCustomDimensions && imageDimensions.width && imageDimensions.height && {
+        dimensions: {
+          width: parseInt(imageDimensions.width),
+          height: parseInt(imageDimensions.height)
+        }
+      }),
+      filename: productData ? generateImageFilename(selectedFile || undefined) : undefined
     };
 
     imageOperationMutation.mutate(operationData);
@@ -220,6 +255,8 @@ export default function UnifiedImageWorkflow() {
     setSelectedFile(null);
     setImagePreview('');
     setOperationResult(null);
+    setImageDimensions({ width: '', height: '' });
+    setUseCustomDimensions(false);
   };
 
   return (
@@ -454,6 +491,76 @@ export default function UnifiedImageWorkflow() {
               </TabsContent>
             </Tabs>
 
+            {/* Dimension Selection */}
+            <div className="space-y-4">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="custom-dimensions"
+                  checked={useCustomDimensions}
+                  onCheckedChange={(checked) => setUseCustomDimensions(!!checked)}
+                  data-testid="checkbox-custom-dimensions"
+                />
+                <Label htmlFor="custom-dimensions" className="text-sm">
+                  Set custom dimensions for image processing
+                </Label>
+              </div>
+              
+              {useCustomDimensions && (
+                <div className="space-y-3">
+                  <Label>Image Dimensions</Label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="width" className="text-sm">Width (px)</Label>
+                      <Select 
+                        value={imageDimensions.width} 
+                        onValueChange={(value) => setImageDimensions(prev => ({...prev, width: value}))}
+                      >
+                        <SelectTrigger data-testid="select-image-width">
+                          <SelectValue placeholder="Select width" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="300">300px</SelectItem>
+                          <SelectItem value="400">400px</SelectItem>
+                          <SelectItem value="500">500px</SelectItem>
+                          <SelectItem value="600">600px</SelectItem>
+                          <SelectItem value="800">800px</SelectItem>
+                          <SelectItem value="1000">1000px</SelectItem>
+                          <SelectItem value="1200">1200px</SelectItem>
+                          <SelectItem value="1500">1500px</SelectItem>
+                          <SelectItem value="2000">2000px</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="height" className="text-sm">Height (px)</Label>
+                      <Select 
+                        value={imageDimensions.height} 
+                        onValueChange={(value) => setImageDimensions(prev => ({...prev, height: value}))}
+                      >
+                        <SelectTrigger data-testid="select-image-height">
+                          <SelectValue placeholder="Select height" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="300">300px</SelectItem>
+                          <SelectItem value="400">400px</SelectItem>
+                          <SelectItem value="500">500px</SelectItem>
+                          <SelectItem value="600">600px</SelectItem>
+                          <SelectItem value="800">800px</SelectItem>
+                          <SelectItem value="1000">1000px</SelectItem>
+                          <SelectItem value="1200">1200px</SelectItem>
+                          <SelectItem value="1500">1500px</SelectItem>
+                          <SelectItem value="2000">2000px</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <p className="text-sm text-gray-500">
+                    Images will be resized to these dimensions during upload
+                  </p>
+                </div>
+              )}
+            </div>
+
             {imagePreview && (
               <div className="space-y-2">
                 <Label>Image Preview</Label>
@@ -465,6 +572,11 @@ export default function UnifiedImageWorkflow() {
                     data-testid="img-preview"
                   />
                 </div>
+                {productData && (
+                  <div className="text-sm text-gray-600">
+                    <strong>Generated filename:</strong> {generateImageFilename(selectedFile || undefined)}
+                  </div>
+                )}
               </div>
             )}
           </CardContent>
