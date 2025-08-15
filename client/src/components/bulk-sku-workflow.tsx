@@ -71,7 +71,7 @@ export default function BulkSkuWorkflow() {
   const [altText, setAltText] = useState('');
 
   // Dimension state
-  const [imageDimensions, setImageDimensions] = useState({ width: '612', height: '612' }); // Default 612x612
+  const [imageDimensions, setImageDimensions] = useState({ width: '640', height: '640' }); // Default 640x640
   const [useCustomDimensions, setUseCustomDimensions] = useState(false);
 
   // Progress state
@@ -319,7 +319,7 @@ export default function BulkSkuWorkflow() {
     setZipFile(null);
     setAltText('');
     setCurrentBatch(null);
-    setImageDimensions({ width: '', height: '' });
+    setImageDimensions({ width: '640', height: '640' });
     setUseCustomDimensions(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
     if (zipInputRef.current) zipInputRef.current.value = '';
@@ -597,7 +597,7 @@ export default function BulkSkuWorkflow() {
               {!useCustomDimensions && (
                 <div className="p-3 bg-gray-50 dark:bg-gray-900 rounded-lg border">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">Default: 612 × 612 pixels</span>
+                    <span className="text-sm font-medium">Default: 640 × 640 pixels</span>
                     <Button
                       variant="outline"
                       size="sm"
@@ -619,7 +619,7 @@ export default function BulkSkuWorkflow() {
                       size="sm"
                       onClick={() => {
                         setUseCustomDimensions(false);
-                        setImageDimensions({ width: '612', height: '612' });
+                        setImageDimensions({ width: '640', height: '640' });
                       }}
                       data-testid="button-reset-dimensions"
                     >
@@ -637,7 +637,7 @@ export default function BulkSkuWorkflow() {
                           <SelectValue placeholder="Select width" />
                         </SelectTrigger>
                         <SelectContent>
-                          {[300, 400, 500, 600, 800, 1000, 1200, 1500, 2000].map(size => (
+                          {[300, 400, 500, 600, 640, 800, 1000, 1200, 1500, 2000].map(size => (
                             <SelectItem key={size} value={size.toString()}>{size}px</SelectItem>
                           ))}
                         </SelectContent>
@@ -652,7 +652,7 @@ export default function BulkSkuWorkflow() {
                           <SelectValue placeholder="Select height" />
                         </SelectTrigger>
                         <SelectContent>
-                          {[300, 400, 500, 600, 800, 1000, 1200, 1500, 2000].map(size => (
+                          {[300, 400, 500, 600, 640, 800, 1000, 1200, 1500, 2000].map(size => (
                             <SelectItem key={size} value={size.toString()}>{size}px</SelectItem>
                           ))}
                         </SelectContent>

@@ -57,8 +57,8 @@ export default function UnifiedImageWorkflow() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>('');
   
-  // Dimension state
-  const [imageDimensions, setImageDimensions] = useState({ width: '', height: '' });
+  // Dimension state - default to 640x640
+  const [imageDimensions, setImageDimensions] = useState({ width: '640', height: '640' });
   const [useCustomDimensions, setUseCustomDimensions] = useState(false);
 
   // Results state
@@ -78,7 +78,7 @@ export default function UnifiedImageWorkflow() {
     
     const dimensions = useCustomDimensions && imageDimensions.width && imageDimensions.height
       ? `${imageDimensions.width}x${imageDimensions.height}`
-      : 'original';
+      : '640x640';
     
     const extension = file?.name.split('.').pop() || 'jpg';
     
@@ -500,16 +500,25 @@ export default function UnifiedImageWorkflow() {
 
             {/* Dimension Selection */}
             <div className="space-y-4">
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="custom-dimensions"
-                  checked={useCustomDimensions}
-                  onCheckedChange={(checked) => setUseCustomDimensions(!!checked)}
-                  data-testid="checkbox-custom-dimensions"
-                />
-                <Label htmlFor="custom-dimensions" className="text-sm">
-                  Set custom dimensions for image processing
-                </Label>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="custom-dimensions"
+                      checked={useCustomDimensions}
+                      onCheckedChange={(checked) => setUseCustomDimensions(!!checked)}
+                      data-testid="checkbox-custom-dimensions"
+                    />
+                    <Label htmlFor="custom-dimensions" className="text-sm">
+                      Set custom dimensions for image processing
+                    </Label>
+                  </div>
+                  {!useCustomDimensions && (
+                    <div className="text-sm text-gray-600 bg-gray-50 px-3 py-1 rounded">
+                      Default: 640×640px
+                    </div>
+                  )}
+                </div>
               </div>
               
               {useCustomDimensions && (
@@ -530,6 +539,7 @@ export default function UnifiedImageWorkflow() {
                           <SelectItem value="400">400px</SelectItem>
                           <SelectItem value="500">500px</SelectItem>
                           <SelectItem value="600">600px</SelectItem>
+                          <SelectItem value="640">640px</SelectItem>
                           <SelectItem value="800">800px</SelectItem>
                           <SelectItem value="1000">1000px</SelectItem>
                           <SelectItem value="1200">1200px</SelectItem>
@@ -552,6 +562,7 @@ export default function UnifiedImageWorkflow() {
                           <SelectItem value="400">400px</SelectItem>
                           <SelectItem value="500">500px</SelectItem>
                           <SelectItem value="600">600px</SelectItem>
+                          <SelectItem value="640">640px</SelectItem>
                           <SelectItem value="800">800px</SelectItem>
                           <SelectItem value="1000">1000px</SelectItem>
                           <SelectItem value="1200">1200px</SelectItem>
