@@ -1040,11 +1040,6 @@ async function processBatchOperations(
         try {
           console.log(`Processing ${operationType} operation for SKU: ${sku}`);
           
-          // Use the same approach as single operations - upload the image buffer directly
-          const imageUrl = await shopify.uploadImageFromBuffer(imageBuffer, altText || `Image for ${sku}`);
-          
-          console.log(`Successfully uploaded file to Shopify: ${imageUrl}`);
-          
           let result;
           let previewUrl = '';
           let liveUrl = '';
@@ -1054,19 +1049,32 @@ async function processBatchOperations(
             const existingImageId = productVariant.image?.id || (productVariant.product?.images?.edges?.[0]?.node?.id);
             
             console.log(`Replacing image for variant ${productVariant.id}, existing image: ${existingImageId}`);
-            result = await shopify.replaceVariantImage(
-              productVariant.id, 
+            
+            // Step 1: Delete the old image first (same as before)
+            if (existingImageId && existingImageId !== 'null' && existingImageId !== '') {
+              try {
+                console.log(`Deleting old image first: ${existingImageId}`);
+                const deletionSuccessful = await shopify.deleteProductMedia(productVariant.product.id, existingImageId);
+                console.log(`Old image deletion result: ${deletionSuccessful}`);
+              } catch (deleteError) {
+                console.warn(`Failed to delete old image ${existingImageId}:`, deleteError);
+              }
+            }
+            
+            // Step 2: Create new product media directly from buffer
+            console.log(`Creating new product media from buffer for product ${productVariant.product.id}`);
+            result = await shopify.createProductMediaFromBuffer(
               productVariant.product.id, 
-              imageUrl, 
-              altText,
-              existingImageId
+              imageBuffer, 
+              altText || `Image for ${sku}`
             );
+            
           } else if (operationType === 'add' && productVariant) {
             console.log(`Adding new image to product ${productVariant.product.id}`);
-            result = await shopify.addImageToProduct(
+            result = await shopify.createProductMediaFromBuffer(
               productVariant.product.id, 
-              imageUrl, 
-              altText
+              imageBuffer, 
+              altText || `Image for ${sku}`
             );
           }
           

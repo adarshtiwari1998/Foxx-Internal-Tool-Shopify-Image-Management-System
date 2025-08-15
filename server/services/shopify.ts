@@ -656,10 +656,10 @@ export class ShopifyService {
     return data.product.media.edges.map((edge: any) => edge.node);
   }
 
-  // Upload image from buffer - direct upload method for bulk operations
-  async uploadImageFromBuffer(imageBuffer: Buffer, altText?: string): Promise<string> {
+  // Direct method to create product media from buffer for bulk operations
+  async createProductMediaFromBuffer(productId: string, imageBuffer: Buffer, altText?: string): Promise<ShopifyImage> {
     try {
-      console.log(`Uploading image buffer (${imageBuffer.length} bytes) with alt text: "${altText || 'none'}"`);
+      console.log(`Creating product media from buffer (${imageBuffer.length} bytes) for product: ${productId}`);
       
       // Determine MIME type based on buffer content
       let mimeType = 'image/jpeg'; // default
@@ -710,16 +710,58 @@ export class ShopifyService {
       
       console.log(`File uploaded successfully to staged target`);
       
-      // Step 3: Create file from staged upload
-      console.log(`Creating Shopify file from staged upload: ${stagedTarget.resourceUrl}`);
-      const fileResult = await this.createFileFromStaged(stagedTarget.resourceUrl, altText);
+      // Step 3: Create product media directly from staged upload
+      console.log(`Creating product media from staged upload: ${stagedTarget.resourceUrl}`);
       
-      console.log(`File created successfully with ID: ${fileResult.id}`);
-      console.log(`File URL: ${fileResult.url}`);
+      const query = `
+        mutation productCreateMedia($media: [CreateMediaInput!]!, $productId: ID!) {
+          productCreateMedia(media: $media, productId: $productId) {
+            media {
+              ... on MediaImage {
+                id
+                alt
+                image {
+                  url
+                }
+              }
+            }
+            mediaUserErrors {
+              field
+              message
+            }
+            product {
+              id
+            }
+          }
+        }
+      `;
+
+      const data = await this.graphqlRequest(query, {
+        productId: productId,
+        media: [{
+          originalSource: stagedTarget.resourceUrl,
+          alt: altText || '',
+          mediaContentType: "IMAGE"
+        }]
+      });
+
+      if (data.productCreateMedia.mediaUserErrors?.length > 0) {
+        throw new Error(`Product media creation error: ${data.productCreateMedia.mediaUserErrors[0].message}`);
+      }
+
+      const mediaImage = data.productCreateMedia.media[0];
+      console.log('Created media response:', JSON.stringify(mediaImage, null, 2));
       
-      return fileResult.url;
+      // Handle the case where image might be null or undefined
+      const resultImageUrl = mediaImage.image?.url || ''; // Use empty string as fallback
+      
+      return {
+        id: mediaImage.id,
+        url: resultImageUrl,
+        altText: mediaImage.alt,
+      };
     } catch (error) {
-      console.error('Error in uploadImageFromBuffer:', error);
+      console.error('Error in createProductMediaFromBuffer:', error);
       throw error;
     }
   }
