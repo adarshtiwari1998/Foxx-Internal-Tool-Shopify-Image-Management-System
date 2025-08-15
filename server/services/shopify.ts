@@ -657,7 +657,7 @@ export class ShopifyService {
   }
 
   // Direct method to create product media from buffer for bulk operations
-  async createProductMediaFromBuffer(productId: string, imageBuffer: Buffer, altText?: string): Promise<ShopifyImage> {
+  async createProductMediaFromBuffer(productId: string, imageBuffer: Buffer, altText?: string, customFilename?: string, fileExtension?: string): Promise<ShopifyImage> {
     try {
       console.log(`Creating product media from buffer (${imageBuffer.length} bytes) for product: ${productId}`);
       
@@ -674,10 +674,34 @@ export class ShopifyService {
         }
       }
       
-      // Create a unique filename
-      const timestamp = Date.now();
-      const extension = mimeType.split('/')[1];
-      const filename = `bulk_upload_${timestamp}.${extension}`;
+      // Use custom filename if provided, otherwise create a unique filename
+      let filename: string;
+      let extension: string;
+      
+      if (customFilename && fileExtension) {
+        // Use provided custom filename and extension
+        extension = fileExtension === 'jpeg' ? 'jpg' : fileExtension;
+        filename = customFilename.replace(/\.[^/.]+$/, '') + '.' + extension;
+        
+        // Update MIME type to match requested extension
+        switch (fileExtension) {
+          case 'png':
+            mimeType = 'image/png';
+            break;
+          case 'webp':
+            mimeType = 'image/webp';
+            break;
+          case 'jpeg':
+          default:
+            mimeType = 'image/jpeg';
+            break;
+        }
+      } else {
+        // Fallback to auto-detection and timestamp-based naming
+        const timestamp = Date.now();
+        extension = mimeType.split('/')[1];
+        filename = `bulk_upload_${timestamp}.${extension}`;
+      }
       
       console.log(`Creating staged upload for: ${filename} (${mimeType})`);
       

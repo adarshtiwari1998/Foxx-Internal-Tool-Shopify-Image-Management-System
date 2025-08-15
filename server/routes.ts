@@ -669,6 +669,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const uploadMethod = req.body.uploadMethod;
       const altText = req.body.altText || '';
       const dimensions = req.body.dimensions ? JSON.parse(req.body.dimensions) : undefined;
+      const fileExtension = req.body.fileExtension || 'png'; // Default to PNG if not specified
       
       // Parse uploaded files - fix for upload.any() format
       console.log('=== FILE PARSING START ===');
@@ -809,7 +810,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Start async processing
-      processBatchOperations(batch.id, skus, imageFiles, operationType, uploadMethod, altText, dimensions, activeStore);
+      processBatchOperations(batch.id, skus, imageFiles, operationType, uploadMethod, altText, dimensions, activeStore, fileExtension);
 
       res.json(batch);
     } catch (error: any) {
@@ -958,7 +959,8 @@ async function processBatchOperations(
   uploadMethod: string,
   altText: string,
   dimensions: any,
-  activeStore: any
+  activeStore: any,
+  fileExtension: string = 'png'
 ) {
   try {
     await storage.updateBatchOperation(batchId, { status: 'processing' });
@@ -1092,7 +1094,9 @@ async function processBatchOperations(
             result = await shopify.createProductMediaFromBuffer(
               productVariant.product.id, 
               imageBuffer, 
-              altTextToUse
+              altTextToUse,
+              generateBulkImageFilename(sku, productVariant.product.title, dimensions),
+              fileExtension
             );
             
           } else if (operationType === 'add' && productVariant) {
@@ -1100,7 +1104,9 @@ async function processBatchOperations(
             result = await shopify.createProductMediaFromBuffer(
               productVariant.product.id, 
               imageBuffer, 
-              altTextToUse
+              altTextToUse,
+              generateBulkImageFilename(sku, productVariant.product.title, dimensions),
+              fileExtension
             );
           }
           

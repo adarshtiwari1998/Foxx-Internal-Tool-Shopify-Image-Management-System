@@ -172,6 +172,7 @@ export default function BulkSkuWorkflow() {
       individualFiles?: {[sku: string]: File};
       altText?: string;
       dimensions?: { width: number; height: number };
+      fileExtension?: string;
     }) => {
       const formData = new FormData();
       formData.append('skus', JSON.stringify(data.skus));
@@ -189,6 +190,7 @@ export default function BulkSkuWorkflow() {
       }
       if (data.altText) formData.append('altText', data.altText);
       if (data.dimensions) formData.append('dimensions', JSON.stringify(data.dimensions));
+      if (data.fileExtension) formData.append('fileExtension', data.fileExtension);
 
       const response = await fetch('/api/products/batch-operation', {
         method: 'POST',
@@ -404,6 +406,7 @@ export default function BulkSkuWorkflow() {
       zipFile: zipFile || undefined,
       individualFiles: Object.keys(individualFiles).length > 0 ? individualFiles : undefined,
       altText: altText || undefined,
+      fileExtension: fileExtension,
       ...(useCustomDimensions && imageDimensions.width && imageDimensions.height && {
         dimensions: {
           width: parseInt(imageDimensions.width),
