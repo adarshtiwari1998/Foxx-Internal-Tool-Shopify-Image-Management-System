@@ -36,6 +36,8 @@ export interface IStorage {
   getProductOperation(id: string): Promise<ProductOperation | undefined>;
   getProductOperationsByStore(storeId: string): Promise<ProductOperation[]>;
   getRecentProductOperations(limit?: number): Promise<ProductOperation[]>;
+  deleteOperation(id: string): Promise<boolean>;
+  clearAllOperations(): Promise<number>;
 
   // Batch operation methods
   createBatchOperation(batch: InsertBatchOperation): Promise<BatchOperation>;
@@ -148,6 +150,19 @@ export class DatabaseStorage implements IStorage {
       .from(productOperations)
       .orderBy(desc(productOperations.createdAt))
       .limit(limit);
+  }
+
+  async deleteOperation(id: string): Promise<boolean> {
+    const result = await db
+      .delete(productOperations)
+      .where(eq(productOperations.id, id));
+    return result.changes > 0;
+  }
+
+  async clearAllOperations(): Promise<number> {
+    const result = await db
+      .delete(productOperations);
+    return result.changes;
   }
 
   // Batch operation methods

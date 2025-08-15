@@ -556,6 +556,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Delete individual operation
+  app.delete("/api/operations/:id", async (req, res) => {
+    try {
+      const success = await storage.deleteOperation(req.params.id);
+      if (success) {
+        res.json({ success: true });
+      } else {
+        res.status(404).json({ message: "Operation not found" });
+      }
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Bulk delete operations
+  app.post("/api/operations/bulk-delete", async (req, res) => {
+    try {
+      const schema = z.object({
+        operationIds: z.array(z.string()),
+      });
+      
+      const { operationIds } = schema.parse(req.body);
+      
+      const results = await Promise.all(
+        operationIds.map(id => storage.deleteOperation(id))
+      );
+      
+      const deletedCount = results.filter(Boolean).length;
+      
+      res.json({ 
+        success: true, 
+        deletedCount,
+        total: operationIds.length 
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Clear all operations
+  app.delete("/api/operations", async (req, res) => {
+    try {
+      const deletedCount = await storage.clearAllOperations();
+      res.json({ 
+        success: true, 
+        deletedCount 
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Batch processing routes
   app.post("/api/products/batch-search", async (req, res) => {
     try {
