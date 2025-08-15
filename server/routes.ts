@@ -737,41 +737,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         console.log(`ZIP extracted successfully. Found ${Object.keys(zipContent.files).length} files.`);
         
+        // Log all files in ZIP for debugging
+        console.log('=== ZIP CONTENTS DEBUG ===');
+        Object.keys(zipContent.files).forEach(filename => {
+          const file = zipContent.files[filename];
+          console.log(`File: "${filename}" | Dir: ${file.dir} | Size: ${file._data?.uncompressedSize || 0}`);
+        });
+        console.log('=== AVAILABLE SKUs ===');
+        console.log(`SKUs to match: [${skus.join(', ')}]`);
+        console.log('========================');
+        
         // Extract files and match by SKU with flexible matching (ignore extensions)
         for (const [filename, file] of Object.entries(zipContent.files)) {
           if (!file.dir && /\.(jpg|jpeg|png|webp)$/i.test(filename)) {
             // Get filename without path and extension
             const fileBaseName = filename.split('/').pop()?.split('.')[0] || '';
+            console.log(`Processing file: "${filename}" -> base: "${fileBaseName}"`);
             
             // Try multiple matching strategies - ONLY match SKU part, ignore extensions completely
             let matchingSku = skus.find((sku: string) => {
               const skuClean = sku.toLowerCase().trim();
               const fileClean = fileBaseName.toLowerCase().trim();
               
+              console.log(`  Comparing: "${fileClean}" vs SKU "${skuClean}"`);
+              
               // Exact match (ignore case)
-              if (fileClean === skuClean) return true;
+              if (fileClean === skuClean) {
+                console.log(`    ✓ EXACT MATCH`);
+                return true;
+              }
               
               // Remove common separators and match
               const skuNormalized = skuClean.replace(/[-_\s]/g, '');
               const fileNormalized = fileClean.replace(/[-_\s]/g, '');
-              if (fileNormalized === skuNormalized) return true;
+              if (fileNormalized === skuNormalized) {
+                console.log(`    ✓ NORMALIZED MATCH`);
+                return true;
+              }
               
               // Check if filename starts with SKU (good for files like "SKU-001_image1.jpg")
-              if (fileClean.startsWith(skuClean)) return true;
+              if (fileClean.startsWith(skuClean)) {
+                console.log(`    ✓ STARTS WITH MATCH`);
+                return true;
+              }
               
               // Check if filename contains the full SKU surrounded by separators or at start/end
-              const regex = new RegExp(`(^|[-_\s])${escapeRegex(skuClean)}([-_\s]|$)`, 'i');
-              if (regex.test(fileClean)) return true;
+              try {
+                const regex = new RegExp(`(^|[-_\s])${escapeRegex(skuClean)}([-_\s]|$)`, 'i');
+                if (regex.test(fileClean)) {
+                  console.log(`    ✓ REGEX MATCH`);
+                  return true;
+                }
+              } catch (e) {
+                console.warn(`    Regex error for SKU ${skuClean}:`, e);
+              }
               
               return false;
             });
             
             if (matchingSku) {
-              console.log(`✓ Matched file "${filename}" to SKU "${matchingSku}"`);
+              console.log(`✅ SUCCESS: Matched file "${filename}" to SKU "${matchingSku}"`);
               imageFiles[matchingSku] = await file.async('nodebuffer');
             } else {
-              console.warn(`✗ Could not match file "${filename}" to any SKU. File base: "${fileBaseName}", Available SKUs: [${skus.join(', ')}]`);
+              console.error(`❌ FAILED: Could not match file "${filename}" (base: "${fileBaseName}") to any SKU: [${skus.join(', ')}]`);
             }
+          } else {
+            console.log(`Skipping non-image file: "${filename}"`);
           }
         }
         
@@ -820,6 +851,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(batch);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ZIP preview route
+  app.post("/api/files/zip-preview", upload.single('zipFile'), async (req: MulterRequest, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "No ZIP file provided" });
+      }
+
+      if (!req.file.originalname.toLowerCase().endsWith('.zip')) {
+        return res.status(400).json({ message: "File must be a ZIP archive" });
+      }
+
+      const zipBuffer = req.file.buffer;
+      const zip = new JSZip();
+      const zipContent = await zip.loadAsync(zipBuffer);
+      
+      const files = [];
+      for (const [filename, file] of Object.entries(zipContent.files)) {
+        if (!file.dir && /\.(jpg|jpeg|png|webp)$/i.test(filename)) {
+          files.push({
+            filename: filename,
+            basename: filename.split('/').pop()?.split('.')[0] || '',
+            size: file._data?.uncompressedSize || 0,
+            extension: filename.split('.').pop()?.toLowerCase() || ''
+          });
+        }
+      }
+
+      res.json({
+        totalFiles: Object.keys(zipContent.files).length,
+        imageFiles: files,
+        zipName: req.file.originalname,
+        zipSize: req.file.size
+      });
+    } catch (error: any) {
+      res.status(500).json({ 
+        message: error.message || "Failed to preview ZIP file",
+        error: error.toString()
+      });
     }
   });
 

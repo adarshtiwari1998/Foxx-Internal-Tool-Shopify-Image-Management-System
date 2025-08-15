@@ -76,6 +76,20 @@ export default function BulkSkuWorkflow() {
   const [imagePreview, setImagePreview] = useState<string>(''); // Add image preview
   const [individualFiles, setIndividualFiles] = useState<{[sku: string]: File}>({}); // Individual files for each SKU
 
+  // ZIP preview state
+  const [zipPreview, setZipPreview] = useState<{
+    totalFiles: number;
+    imageFiles: Array<{
+      filename: string;
+      basename: string;
+      size: number;
+      extension: string;
+    }>;
+    zipName: string;
+    zipSize: number;
+  } | null>(null);
+  const [isPreviewingZip, setIsPreviewingZip] = useState(false);
+
   // Dimension state
   const [imageDimensions, setImageDimensions] = useState({ width: '640', height: '640' }); // Default 640x640
   const [useCustomDimensions, setUseCustomDimensions] = useState(false);
@@ -272,7 +286,50 @@ export default function BulkSkuWorkflow() {
         return;
       }
       setZipFile(file);
+      // Automatically preview the ZIP when selected
+      previewZipFile(file);
     }
+  };
+
+  // ZIP preview mutation
+  const zipPreviewMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append('zipFile', file);
+      
+      const response = await fetch('/api/files/zip-preview', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setZipPreview(data);
+      setIsPreviewingZip(false);
+      toast({
+        title: "ZIP Preview Ready",
+        description: `Found ${data.imageFiles.length} image files in ZIP`,
+      });
+    },
+    onError: (error: any) => {
+      setIsPreviewingZip(false);
+      toast({
+        title: "Preview Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const previewZipFile = (file: File) => {
+    setIsPreviewingZip(true);
+    setZipPreview(null);
+    zipPreviewMutation.mutate(file);
   };
 
   // Handle batch operation submit
@@ -341,6 +398,7 @@ export default function BulkSkuWorkflow() {
     setSearchResults([]);
     setSelectedFile(null);
     setZipFile(null);
+    setZipPreview(null);
     setIndividualFiles({});
     setAltText('');
     setCurrentBatch(null);
@@ -807,6 +865,86 @@ export default function BulkSkuWorkflow() {
                     </ul>
                   </div>
                 </div>
+                
+                {/* ZIP Preview */}
+                {isPreviewingZip && (
+                  <div className="p-3 bg-yellow-50 dark:bg-yellow-950 rounded-lg">
+                    <div className="flex items-center space-x-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span className="text-sm">Analyzing ZIP file...</span>
+                    </div>
+                  </div>
+                )}
+                
+                {zipPreview && (
+                  <div className="p-4 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg">
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-medium text-green-900 dark:text-green-100">📦 ZIP Contents Preview</h4>
+                        <div className="text-sm text-green-700 dark:text-green-300">
+                          {zipPreview.imageFiles.length} image files found
+                        </div>
+                      </div>
+                      
+                      <div className="text-sm text-green-700 dark:text-green-300">
+                        <strong>ZIP:</strong> {zipPreview.zipName} ({Math.round(zipPreview.zipSize / 1024)} KB)
+                      </div>
+                      
+                      {zipPreview.imageFiles.length > 0 ? (
+                        <div className="space-y-2">
+                          <div className="text-sm font-medium text-green-900 dark:text-green-100">Image Files:</div>
+                          <div className="max-h-32 overflow-y-auto space-y-1">
+                            {zipPreview.imageFiles.map((file, index) => {
+                              const matchesSku = skuArray.some(sku => 
+                                sku.toLowerCase() === file.basename.toLowerCase() ||
+                                file.basename.toLowerCase().includes(sku.toLowerCase()) ||
+                                sku.toLowerCase().includes(file.basename.toLowerCase())
+                              );
+                              return (
+                                <div 
+                                  key={index} 
+                                  className={`flex items-center justify-between text-xs p-2 rounded ${ 
+                                    matchesSku 
+                                      ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200' 
+                                      : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
+                                  }`}
+                                >
+                                  <div className="flex items-center space-x-2">
+                                    {matchesSku ? (
+                                      <CheckCircle className="h-3 w-3 text-green-600" />
+                                    ) : (
+                                      <AlertCircle className="h-3 w-3 text-orange-500" />
+                                    )}
+                                    <span className="font-mono">{file.filename}</span>
+                                  </div>
+                                  <div className="text-xs">
+                                    {Math.round(file.size / 1024)}KB
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                          
+                          {zipPreview.imageFiles.some(file => 
+                            !skuArray.some(sku => 
+                              sku.toLowerCase() === file.basename.toLowerCase() ||
+                              file.basename.toLowerCase().includes(sku.toLowerCase()) ||
+                              sku.toLowerCase().includes(file.basename.toLowerCase())
+                            )
+                          ) && (
+                            <div className="text-xs text-orange-600 dark:text-orange-400 mt-2">
+                              ⚠️ Some files may not match any found SKUs and will be skipped during processing.
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="text-sm text-red-600 dark:text-red-400">
+                          ❌ No valid image files found in ZIP. Make sure your ZIP contains JPG, PNG, or WEBP files.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
