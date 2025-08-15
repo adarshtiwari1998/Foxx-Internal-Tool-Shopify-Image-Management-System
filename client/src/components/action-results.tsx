@@ -216,15 +216,16 @@ export default function ActionResults() {
           )}
         </CardDescription>
       </CardHeader>
-      <CardContent>
-        {isLoading ? (
-          <div className="text-center py-8">
-            <div className="animate-spin h-6 w-6 border-2 border-foxx-blue border-t-transparent rounded-full mx-auto mb-2" />
-            <p className="text-gray-500">Loading operations...</p>
-          </div>
-        ) : recentOperations.length > 0 ? (
-          <div className="space-y-4" data-testid="operations-list">
-            {recentOperations.map((operation) => (
+      <CardContent className="p-0">
+        <div className="max-h-96 overflow-y-auto p-6">
+          {isLoading ? (
+            <div className="text-center py-8">
+              <div className="animate-spin h-6 w-6 border-2 border-foxx-blue border-t-transparent rounded-full mx-auto mb-2" />
+              <p className="text-gray-500">Loading operations...</p>
+            </div>
+          ) : recentOperations.length > 0 ? (
+            <div className="space-y-4" data-testid="operations-list">
+              {recentOperations.map((operation) => (
               <div
                 key={operation.id}
                 className={`border rounded-lg p-4 ${getStatusColor(operation.status)}`}
@@ -265,7 +266,9 @@ export default function ActionResults() {
                         <>Successfully {operation.operationType === 'replace' ? 'replaced' : 'added'} product image</>
                       )}
                       {operation.status === 'error' && (
-                        <>Failed to {operation.operationType} image: {operation.errorMessage}</>
+                        <div className="break-words max-w-full">
+                          Failed to {operation.operationType} image: {operation.errorMessage}
+                        </div>
                       )}
                       {operation.status === 'pending' && (
                         <>Processing {operation.operationType} operation...</>
@@ -320,15 +323,16 @@ export default function ActionResults() {
                   </div>
                 </div>
               </div>
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-8 text-gray-500" data-testid="no-operations">
-            <Clock className="mx-auto h-8 w-8 mb-2" />
-            <p>No operations performed yet</p>
-            <p className="text-sm">Results will appear here after actions are completed</p>
-          </div>
-        )}
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-gray-500" data-testid="no-operations">
+              <Clock className="mx-auto h-8 w-8 mb-2" />
+              <p>No operations performed yet</p>
+              <p className="text-sm">Results will appear here after actions are completed</p>
+            </div>
+          )}
+        </div>
       </CardContent>
     </Card>
   );
