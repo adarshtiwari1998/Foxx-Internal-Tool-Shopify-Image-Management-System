@@ -576,16 +576,23 @@ export class ShopifyService {
     // Check if it's a ProductImage ID (legacy format)
     if (imageId.includes('ProductImage')) {
       console.log(`Legacy ProductImage ID detected: ${imageId}`);
-      // For ProductImage IDs, we need to get the corresponding MediaImage
+      // For ProductImage IDs, we need to get the corresponding MediaImage and delete it
       try {
         const productMedia = await this.getProductMedia(productId);
         console.log(`Found ${productMedia.length} media items on product`);
         
-        // Try to find a matching MediaImage by checking if any media item could correspond to this ProductImage
-        // Since the ProductImage might be an older format, let's just skip the deletion
-        // and let the new image be added (this is safer than trying to guess which media to delete)
-        console.log(`Skipping deletion of legacy ProductImage - will add new image instead`);
-        return false; // Return false but don't throw error
+        if (productMedia.length > 0) {
+          // Get the first media item (which is likely the variant's current image)
+          // In most cases with single variant products, this will be the correct image to replace
+          const mediaToDelete = productMedia[0];
+          console.log(`Attempting to delete MediaImage: ${mediaToDelete.id}`);
+          
+          // Recursively call this function with the MediaImage ID
+          return await this.deleteProductMedia(productId, mediaToDelete.id);
+        } else {
+          console.log(`No media items found on product - nothing to delete`);
+          return false;
+        }
       } catch (error) {
         console.warn(`Could not fetch product media for deletion: ${error}`);
         return false;
