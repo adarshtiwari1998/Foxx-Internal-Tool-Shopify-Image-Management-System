@@ -660,6 +660,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/products/batch-operation", upload.any(), async (req: any, res) => {
     try {
+      console.log('=== BATCH OPERATION START ===');
+      console.log('req.files type:', typeof req.files);
+      console.log('req.files:', req.files);
+      console.log('req.body keys:', Object.keys(req.body));
       const skus = JSON.parse(req.body.skus);
       const operationType = req.body.operationType;
       const uploadMethod = req.body.uploadMethod;
@@ -667,15 +671,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const dimensions = req.body.dimensions ? JSON.parse(req.body.dimensions) : undefined;
       
       // Parse uploaded files - fix for upload.any() format
-      const singleFile = req.files ? (req.files as any[]).find((f: any) => f.fieldname === 'singleFile') : null;
-      const zipFile = req.files ? (req.files as any[]).find((f: any) => f.fieldname === 'zipFile') : null;
+      console.log('=== FILE PARSING START ===');
+      let singleFile = null;
+      let zipFile = null;
       
-      console.log(`Files received: ${req.files ? (req.files as any[]).length : 0} total`);
       if (req.files && Array.isArray(req.files)) {
-        (req.files as any[]).forEach((f, i) => console.log(`  File ${i}: fieldname='${f.fieldname}', name='${f.originalname}'`));
+        console.log(`Files array length: ${req.files.length}`);
+        req.files.forEach((file, i) => {
+          console.log(`File ${i}: fieldname='${file.fieldname}', name='${file.originalname}', size=${file.size}`);
+          if (file.fieldname === 'singleFile') singleFile = file;
+          if (file.fieldname === 'zipFile') zipFile = file;
+        });
+      } else {
+        console.log('req.files is not an array or is null/undefined');
       }
+      
       console.log(`Single file found: ${!!singleFile}`);
       console.log(`ZIP file found: ${!!zipFile}`);
+      if (zipFile) console.log(`ZIP file details: ${zipFile.originalname} (${zipFile.size} bytes)`);
       
       // Parse individual files - improved handling
       const individualFiles: {[sku: string]: any} = {};
@@ -725,8 +738,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`=== BATCH OPERATION DEBUG ===`);
       console.log(`Upload method: ${uploadMethod}`);
       console.log(`ZIP file present: ${!!zipFile}`);
-      if (zipFile) console.log(`ZIP file details: ${zipFile.originalname} (${zipFile.size} bytes)`);
       console.log(`SKUs to process: [${skus.join(', ')}]`);
+      console.log('=== END DEBUG SECTION ===');
       
       if (uploadMethod === 'zip' && zipFile) {
         // Extract ZIP file
