@@ -728,6 +728,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Process images based on upload method
       let imageFiles: { [sku: string]: Buffer } = {};
 
+      console.log(`=== BATCH OPERATION DEBUG ===`);
+      console.log(`Upload method: ${uploadMethod}`);
+      console.log(`ZIP file present: ${!!zipFile}`);
+      console.log(`SKUs to process: [${skus.join(', ')}]`);
+      
       if (uploadMethod === 'zip' && zipFile) {
         // Extract ZIP file
         console.log(`Processing ZIP file: ${zipFile.originalname} (${zipFile.size} bytes)`);
@@ -771,6 +776,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         console.log(`ZIP processing complete. Matched ${Object.keys(imageFiles).length} images to SKUs out of ${skus.length} requested SKUs.`);
+        console.log(`Available image files for SKUs: [${Object.keys(imageFiles).join(', ')}]`);
         if (Object.keys(imageFiles).length === 0) {
           console.warn('No images were matched! This will cause all operations to fail.');
         }
@@ -1106,7 +1112,7 @@ async function processBatchOperations(
             altText,
             previewUrl,
             liveUrl,
-            metadata: { ...operation.metadata, result },
+            metadata: { ...(operation.metadata || {}), result },
           });
           
           console.log(`Successfully ${operationType}d image for SKU: ${sku}`);
