@@ -3,6 +3,13 @@
 This is a Shopify Image Management System built for internal tools at Foxx Life Sciences. The application allows users to manage product images across multiple Shopify stores, supporting operations like image replacement, addition, and updates. It provides a comprehensive interface for searching products by SKU or URL, uploading images, and tracking operation results.
 
 ## Recent Changes (August 15, 2025)
+- ✅ **MAJOR FIX: Image dimension resizing now works correctly for ALL upload methods**:
+  - **Fixed bulk operations**: Images now properly resize to default 640x640 or custom dimensions
+  - **Fixed single uploads**: All image uploads now apply dimension resizing using Sharp library
+  - **Enhanced createProductMediaFromBuffer**: Added dimension parameter with default 640x640 fallback
+  - **Improved Sharp processing**: Images use 'cover' fit mode with center positioning for optimal results
+  - **Consistent behavior**: Both bulk and single uploads now respect dimension settings
+  - **Technical details**: Updated `createProductMediaFromBuffer` function to use `dimensions` parameter for Sharp resize operations
 - ✅ **MAJOR FIX: File extension conversion now works correctly for ALL upload methods**:
   - **Fixed bulk operations**: Images now properly convert to selected format (PNG, JPEG, WebP)
   - **Fixed filename generation**: Bulk uploads now use correct file extension in filenames

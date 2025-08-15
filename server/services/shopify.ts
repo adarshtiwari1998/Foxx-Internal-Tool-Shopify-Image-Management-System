@@ -659,7 +659,7 @@ export class ShopifyService {
   }
 
   // Direct method to create product media from buffer for bulk operations
-  async createProductMediaFromBuffer(productId: string, imageBuffer: Buffer, altText?: string, customFilename?: string, fileExtension?: string): Promise<ShopifyImage> {
+  async createProductMediaFromBuffer(productId: string, imageBuffer: Buffer, altText?: string, customFilename?: string, fileExtension?: string, dimensions?: { width: number; height: number }): Promise<ShopifyImage> {
     try {
       console.log(`Creating product media from buffer (${imageBuffer.length} bytes) for product: ${productId}`);
       
@@ -676,30 +676,49 @@ export class ShopifyService {
         
         console.log(`Converting image to ${fileExtension} format...`);
         
-        // ACTUALLY CONVERT THE IMAGE using Sharp
+        // ACTUALLY CONVERT AND RESIZE THE IMAGE using Sharp
         try {
-          const sharpImage = sharp(imageBuffer);
+          let sharpImage = sharp(imageBuffer);
+          
+          // Apply dimension resizing if provided
+          if (dimensions && dimensions.width && dimensions.height) {
+            console.log(`Resizing image to ${dimensions.width}x${dimensions.height} pixels...`);
+            sharpImage = sharpImage.resize(dimensions.width, dimensions.height, {
+              fit: 'cover', // Ensures the image fills the entire space
+              position: 'center' // Centers the crop
+            });
+          } else {
+            // Apply default 640x640 resizing if no dimensions provided
+            console.log(`Resizing image to default 640x640 pixels...`);
+            sharpImage = sharpImage.resize(640, 640, {
+              fit: 'cover',
+              position: 'center'
+            });
+          }
           
           switch (fileExtension) {
             case 'png':
               processedImageBuffer = await sharpImage.png({ quality: 100 }).toBuffer();
               mimeType = 'image/png';
-              console.log(`✅ Successfully converted to PNG format`);
+              console.log(`✅ Successfully resized and converted to PNG format`);
               break;
             case 'webp':
               processedImageBuffer = await sharpImage.webp({ quality: 90 }).toBuffer();
               mimeType = 'image/webp';
-              console.log(`✅ Successfully converted to WebP format`);
+              console.log(`✅ Successfully resized and converted to WebP format`);
               break;
             case 'jpeg':
             default:
               processedImageBuffer = await sharpImage.jpeg({ quality: 90 }).toBuffer();
               mimeType = 'image/jpeg';
-              console.log(`✅ Successfully converted to JPEG format`);
+              console.log(`✅ Successfully resized and converted to JPEG format`);
               break;
           }
           
-          console.log(`Image conversion complete: ${imageBuffer.length} bytes -> ${processedImageBuffer.length} bytes`);
+          const targetDimensions = dimensions && dimensions.width && dimensions.height 
+            ? `${dimensions.width}x${dimensions.height}` 
+            : '640x640';
+          console.log(`Image processing complete: ${imageBuffer.length} bytes -> ${processedImageBuffer.length} bytes (resized to ${targetDimensions})`);
         } catch (conversionError) {
           console.error('Image conversion failed, using original buffer:', conversionError);
           // Fall back to original buffer if conversion fails

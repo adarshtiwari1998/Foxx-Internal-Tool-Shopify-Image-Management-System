@@ -1100,7 +1100,8 @@ async function processBatchOperations(
               imageBuffer, 
               altTextToUse,
               generateBulkImageFilename(sku, productVariant.product.title, dimensions, fileExtension),
-              fileExtension
+              fileExtension,
+              dimensions
             );
             
           } else if (operationType === 'add' && productVariant) {
@@ -1110,7 +1111,8 @@ async function processBatchOperations(
               imageBuffer, 
               altTextToUse,
               generateBulkImageFilename(sku, productVariant.product.title, dimensions, fileExtension),
-              fileExtension
+              fileExtension,
+              dimensions
             );
           }
           
