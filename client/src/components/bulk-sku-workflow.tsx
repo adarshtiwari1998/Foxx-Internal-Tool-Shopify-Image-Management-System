@@ -300,8 +300,10 @@ export default function BulkSkuWorkflow() {
       try {
         const formData = new FormData();
         formData.append('zipFile', file);
+        // Send SKUs to server for better matching
+        formData.append('skus', JSON.stringify(skuArray));
         
-        console.log('Sending ZIP preview request for:', file.name);
+        console.log('Sending ZIP preview request for:', file.name, 'with SKUs:', skuArray);
         
         const response = await fetch('/api/files/zip-preview', {
           method: 'POST',
@@ -934,16 +936,29 @@ export default function BulkSkuWorkflow() {
                         <strong>ZIP:</strong> {zipPreview.zipName} ({Math.round(zipPreview.zipSize / 1024)} KB)
                       </div>
                       
+                      {(zipPreview as any).matchedCount !== undefined && (
+                        <div className="text-sm text-green-700 dark:text-green-300">
+                          <strong>Matching:</strong> {(zipPreview as any).matchedCount} files match your SKUs, {(zipPreview as any).unmatchedCount} don't match
+                        </div>
+                      )}
+                      
                       {zipPreview.imageFiles.length > 0 ? (
                         <div className="space-y-2">
                           <div className="text-sm font-medium text-green-900 dark:text-green-100">Image Files:</div>
                           <div className="max-h-32 overflow-y-auto space-y-1">
                             {zipPreview.imageFiles.map((file, index) => {
-                              const matchesSku = skuArray.some(sku => 
-                                sku.toLowerCase() === file.basename.toLowerCase() ||
-                                file.basename.toLowerCase().includes(sku.toLowerCase()) ||
-                                sku.toLowerCase().includes(file.basename.toLowerCase())
-                              );
+                              // Use server-side matching if available, otherwise fallback to client-side
+                              const matchesSku = (file as any).matches !== undefined 
+                                ? (file as any).matches 
+                                : skuArray.some(sku => 
+                                    sku.toLowerCase() === file.basename.toLowerCase() ||
+                                    file.basename.toLowerCase().includes(sku.toLowerCase()) ||
+                                    sku.toLowerCase().includes(file.basename.toLowerCase())
+                                  );
+                              
+                              const matchingSku = (file as any).matchingSku;
+                              const fileSizeKB = Math.round(file.size / 1024);
+                              
                               return (
                                 <div 
                                   key={index} 
@@ -959,10 +974,15 @@ export default function BulkSkuWorkflow() {
                                     ) : (
                                       <AlertCircle className="h-3 w-3 text-orange-500" />
                                     )}
-                                    <span className="font-mono">{file.filename}</span>
+                                    <div>
+                                      <div className="font-mono">{file.filename}</div>
+                                      {matchingSku && (
+                                        <div className="text-xs opacity-75">→ matches SKU: {matchingSku}</div>
+                                      )}
+                                    </div>
                                   </div>
-                                  <div className="text-xs">
-                                    {Math.round(file.size / 1024)}KB
+                                  <div className="text-xs font-medium">
+                                    {fileSizeKB}KB
                                   </div>
                                 </div>
                               );

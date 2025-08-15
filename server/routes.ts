@@ -865,6 +865,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "File must be a ZIP archive" });
       }
 
+      // Parse SKUs from request body if provided
+      const skus = req.body.skus ? JSON.parse(req.body.skus) : [];
+      console.log('ZIP preview with SKUs:', skus);
+
       const zipBuffer = req.file.buffer;
       const zip = new JSZip();
       const zipContent = await zip.loadAsync(zipBuffer);
@@ -872,20 +876,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const files = [];
       for (const [filename, file] of Object.entries(zipContent.files)) {
         if (!file.dir && /\.(jpg|jpeg|png|webp)$/i.test(filename)) {
+          // Get the actual uncompressed file size
+          const uncompressedSize = await file.async('uint8array').then(data => data.length);
+          const fileBaseName = filename.split('/').pop()?.split('.')[0] || '';
+          
+          // Check if this file matches any SKU
+          let matchingSku = null;
+          if (skus.length > 0) {
+            matchingSku = skus.find((sku: string) => {
+              const skuClean = sku.toLowerCase().trim();
+              const fileClean = fileBaseName.toLowerCase().trim();
+              
+              // Exact match (ignore case)
+              if (fileClean === skuClean) return true;
+              
+              // Remove common separators and match
+              const skuNormalized = skuClean.replace(/[-_\s]/g, '');
+              const fileNormalized = fileClean.replace(/[-_\s]/g, '');
+              if (fileNormalized === skuNormalized) return true;
+              
+              // Check if filename starts with SKU
+              if (fileClean.startsWith(skuClean)) return true;
+              
+              // Regex pattern matching
+              try {
+                const regex = new RegExp(`(^|[-_\s])${escapeRegex(skuClean)}([-_\s]|$)`, 'i');
+                if (regex.test(fileClean)) return true;
+              } catch (e) {
+                // Ignore regex errors
+              }
+              
+              return false;
+            });
+          }
+          
           files.push({
             filename: filename,
-            basename: filename.split('/').pop()?.split('.')[0] || '',
-            size: 0, // Size determined during processing
-            extension: filename.split('.').pop()?.toLowerCase() || ''
+            basename: fileBaseName,
+            size: uncompressedSize,
+            extension: filename.split('.').pop()?.toLowerCase() || '',
+            matchingSku: matchingSku || null,
+            matches: !!matchingSku
           });
         }
       }
 
+      // Count matches
+      const matchedFiles = files.filter(f => f.matches);
+      const unmatchedFiles = files.filter(f => !f.matches);
+      
       res.json({
         totalFiles: Object.keys(zipContent.files).length,
         imageFiles: files,
         zipName: req.file.originalname,
-        zipSize: req.file.size
+        zipSize: req.file.size,
+        matchedCount: matchedFiles.length,
+        unmatchedCount: unmatchedFiles.length,
+        providedSkus: skus
       });
     } catch (error: any) {
       res.status(500).json({ 
