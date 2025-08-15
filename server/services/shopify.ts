@@ -476,11 +476,16 @@ export class ShopifyService {
       console.log('Starting replaceVariantImage (DELETE FIRST, THEN ADD):', { variantId, productId, existingImageId });
       
       // STEP 1: DELETE the old image FIRST for true replacement behavior
+      let deletionSuccessful = false;
       if (existingImageId && existingImageId !== 'null' && existingImageId !== '') {
         try {
           console.log(`Deleting old image first: ${existingImageId}`);
-          await this.deleteProductMedia(productId, existingImageId);
-          console.log(`Successfully deleted old product image: ${existingImageId}`);
+          deletionSuccessful = await this.deleteProductMedia(productId, existingImageId);
+          if (deletionSuccessful) {
+            console.log(`Successfully deleted old product image: ${existingImageId}`);
+          } else {
+            console.log(`Old image deletion skipped (likely legacy ProductImage format): ${existingImageId}`);
+          }
         } catch (deleteError) {
           console.warn(`Failed to delete old image ${existingImageId}:`, deleteError);
           // Continue with adding new image even if deletion fails
@@ -495,7 +500,12 @@ export class ShopifyService {
       // Note: Current Shopify API makes it difficult to assign specific media to variants
       // The image is already attached to the product and will be available
       const variantUpdated = await this.updateProductVariantImage(variantId, newImage.id);
-      console.log('Image replacement completed - old deleted, new added');
+      
+      if (deletionSuccessful) {
+        console.log('Image replacement completed - old deleted, new added');
+      } else {
+        console.log('Image addition completed - new image added (old image deletion was skipped due to format incompatibility)');
+      }
       
       return newImage;
     } catch (error) {
@@ -560,7 +570,29 @@ export class ShopifyService {
     return true;
   }
 
-  async deleteProductMedia(productId: string, mediaId: string): Promise<boolean> {
+  async deleteProductMedia(productId: string, imageId: string): Promise<boolean> {
+    console.log(`Attempting to delete image: ${imageId} from product: ${productId}`);
+    
+    // Check if it's a ProductImage ID (legacy format)
+    if (imageId.includes('ProductImage')) {
+      console.log(`Legacy ProductImage ID detected: ${imageId}`);
+      // For ProductImage IDs, we need to get the corresponding MediaImage
+      try {
+        const productMedia = await this.getProductMedia(productId);
+        console.log(`Found ${productMedia.length} media items on product`);
+        
+        // Try to find a matching MediaImage by checking if any media item could correspond to this ProductImage
+        // Since the ProductImage might be an older format, let's just skip the deletion
+        // and let the new image be added (this is safer than trying to guess which media to delete)
+        console.log(`Skipping deletion of legacy ProductImage - will add new image instead`);
+        return false; // Return false but don't throw error
+      } catch (error) {
+        console.warn(`Could not fetch product media for deletion: ${error}`);
+        return false;
+      }
+    }
+    
+    // For MediaImage IDs, use the proper deletion mutation
     const query = `
       mutation productDeleteMedia($productId: ID!, $mediaIds: [ID!]!) {
         productDeleteMedia(productId: $productId, mediaIds: $mediaIds) {
@@ -575,13 +607,45 @@ export class ShopifyService {
 
     const data = await this.graphqlRequest(query, {
       productId: productId,
-      mediaIds: [mediaId]
+      mediaIds: [imageId]
     });
 
     if (data.productDeleteMedia.mediaUserErrors?.length > 0) {
       throw new Error(`Media deletion error: ${data.productDeleteMedia.mediaUserErrors[0].message}`);
     }
 
-    return data.productDeleteMedia.deletedMediaIds.includes(mediaId);
+    const deleted = data.productDeleteMedia.deletedMediaIds.includes(imageId);
+    console.log(`MediaImage deletion result: ${deleted}`);
+    return deleted;
+  }
+
+  async getProductMedia(productId: string): Promise<any[]> {
+    const query = `
+      query getProductMedia($id: ID!) {
+        product(id: $id) {
+          media(first: 50) {
+            edges {
+              node {
+                ... on MediaImage {
+                  id
+                  alt
+                  image {
+                    url
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    `;
+
+    const data = await this.graphqlRequest(query, { id: productId });
+    
+    if (!data.product) {
+      return [];
+    }
+
+    return data.product.media.edges.map((edge: any) => edge.node);
   }
 }
