@@ -68,12 +68,13 @@ export default function BulkSkuWorkflow() {
   // Operation state
   const [operationType, setOperationType] = useState<'replace' | 'add'>('replace');
   const [inputMethod, setInputMethod] = useState<'sku_paste' | 'sku_list' | 'url_list' | 'direct_image'>('sku_paste'); // Multiple input methods including direct upload
-  const [uploadMethod, setUploadMethod] = useState<'single' | 'zip'>('zip'); // Default to ZIP
+  const [uploadMethod, setUploadMethod] = useState<'single' | 'zip' | 'individual'>('zip'); // Default to ZIP
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [zipFile, setZipFile] = useState<File | null>(null);
   const [altText, setAltText] = useState('');
   const [fileExtension, setFileExtension] = useState<'png' | 'jpeg' | 'webp'>('png'); // Default PNG
   const [imagePreview, setImagePreview] = useState<string>(''); // Add image preview
+  const [individualFiles, setIndividualFiles] = useState<{[sku: string]: File}>({}); // Individual files for each SKU
 
   // Dimension state
   const [imageDimensions, setImageDimensions] = useState({ width: '640', height: '640' }); // Default 640x640
@@ -151,9 +152,10 @@ export default function BulkSkuWorkflow() {
     mutationFn: async (data: {
       skus: string[];
       operationType: 'replace' | 'add';
-      uploadMethod: 'single' | 'zip';
+      uploadMethod: 'single' | 'zip' | 'individual';
       file?: File;
       zipFile?: File;
+      individualFiles?: {[sku: string]: File};
       altText?: string;
       dimensions?: { width: number; height: number };
     }) => {
@@ -164,6 +166,13 @@ export default function BulkSkuWorkflow() {
       
       if (data.file) formData.append('singleFile', data.file);
       if (data.zipFile) formData.append('zipFile', data.zipFile);
+      if (data.individualFiles) {
+        Object.entries(data.individualFiles).forEach(([sku, file], index) => {
+          formData.append(`individualFile_${index}`, file);
+          formData.append(`individualSku_${index}`, sku);
+        });
+        formData.append('individualFilesCount', Object.keys(data.individualFiles).length.toString());
+      }
       if (data.altText) formData.append('altText', data.altText);
       if (data.dimensions) formData.append('dimensions', JSON.stringify(data.dimensions));
 
@@ -297,12 +306,22 @@ export default function BulkSkuWorkflow() {
       return;
     }
 
+    if (uploadMethod === 'individual' && Object.keys(individualFiles).length === 0) {
+      toast({
+        title: "No Files Selected",
+        description: "Please select at least one image file for the products",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const operationData = {
       skus: foundProducts.map(p => p.sku),
       operationType,
       uploadMethod,
       file: selectedFile || undefined,
       zipFile: zipFile || undefined,
+      individualFiles: Object.keys(individualFiles).length > 0 ? individualFiles : undefined,
       altText: altText || undefined,
       ...(useCustomDimensions && imageDimensions.width && imageDimensions.height && {
         dimensions: {
@@ -322,6 +341,7 @@ export default function BulkSkuWorkflow() {
     setSearchResults([]);
     setSelectedFile(null);
     setZipFile(null);
+    setIndividualFiles({});
     setAltText('');
     setCurrentBatch(null);
     setImageDimensions({ width: '640', height: '640' });
@@ -570,10 +590,10 @@ export default function BulkSkuWorkflow() {
                       )}
                       
                       {/* Product Image Preview */}
-                      {(result.product?.image?.url || result.product?.product?.images?.edges?.[0]?.node?.url) && (
+                      {(result.product?.image?.url || result.product?.product?.images?.[0]?.src) && (
                         <img 
-                          src={result.product.image?.url || result.product.product.images.edges[0].node.url}
-                          alt={result.product.image?.altText || result.product.product.images.edges?.[0]?.node?.altText || 'Product image'}
+                          src={result.product.image?.url || result.product.product.images[0].src}
+                          alt={result.product.image?.altText || result.product.product.images?.[0]?.altText || 'Product image'}
                           className="w-12 h-12 object-cover rounded border"
                           data-testid={`image-preview-${result.sku}`}
                         />
@@ -586,9 +606,9 @@ export default function BulkSkuWorkflow() {
                             {result.product.product.title} - {result.product.title}
                           </div>
                         )}
-                        {(result.product?.image?.altText || result.product?.product?.images?.edges?.[0]?.node?.altText) && (
+                        {(result.product?.image?.altText || result.product?.product?.images?.[0]?.altText) && (
                           <div className="text-xs text-blue-600 truncate max-w-md">
-                            💬 Alt: {result.product.image?.altText || result.product.product.images.edges[0].node.altText}
+                            💬 Alt: {result.product.image?.altText || (result.product.product.images?.[0]?.altText)}
                           </div>
                         )}
                         {result.error && (
@@ -682,9 +702,16 @@ export default function BulkSkuWorkflow() {
                     <span>🗂 ZIP folder with pictures named by product code</span>
                   </Label>
                 </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="individual" id="individual" />
+                  <Label htmlFor="individual" className="flex items-center space-x-2">
+                    <Upload className="h-4 w-4" />
+                    <span>📤 Upload one by one for each product</span>
+                  </Label>
+                </div>
               </RadioGroup>
               <p className="text-sm text-muted-foreground">
-                💡 Tip: Use ZIP when you have different pictures for each product!
+                💡 Tip: Use ZIP for many products, or Individual to upload specific pictures for each product!
               </p>
             </div>
 
@@ -779,6 +806,75 @@ export default function BulkSkuWorkflow() {
                       <li>Images not matching found SKUs will be ignored</li>
                     </ul>
                   </div>
+                </div>
+              </div>
+            )}
+
+            {uploadMethod === 'individual' && searchResults.filter(r => r.status === 'found').length > 0 && (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>📎 Choose pictures for each product</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Upload a specific picture for each product found. You can skip products you don't want to update.
+                  </p>
+                </div>
+                
+                <div className="space-y-3 max-h-64 overflow-y-auto p-2 border rounded-lg">
+                  {searchResults.filter(r => r.status === 'found').map((result, index) => {
+                    const file = individualFiles[result.sku];
+                    return (
+                      <div key={result.sku} className="flex items-center space-x-3 p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
+                        {/* Product Image Preview */}
+                        <div className="w-12 h-12 border rounded overflow-hidden flex-shrink-0">
+                          {(result.product?.image?.url || result.product?.product?.images?.[0]?.src) ? (
+                            <img 
+                              src={result.product.image?.url || result.product.product.images[0].src}
+                              alt={result.product.image?.altText || result.product.product.images?.[0]?.altText || 'Product image'}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full bg-gray-200 flex items-center justify-center">
+                              <Upload className="h-4 w-4 text-gray-400" />
+                            </div>
+                          )}
+                        </div>
+                        
+                        {/* Product Info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="font-mono text-sm font-medium truncate">{result.sku}</div>
+                          <div className="text-xs text-muted-foreground truncate">
+                            {result.product?.product.title} - {result.product?.title}
+                          </div>
+                        </div>
+                        
+                        {/* File Upload */}
+                        <div className="flex items-center space-x-2 flex-shrink-0">
+                          <Input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => {
+                              const selectedFile = e.target.files?.[0];
+                              if (selectedFile) {
+                                setIndividualFiles(prev => ({
+                                  ...prev,
+                                  [result.sku]: selectedFile
+                                }));
+                              }
+                            }}
+                            className="w-32 text-xs"
+                            data-testid={`input-individual-${result.sku}`}
+                          />
+                          {file && (
+                            <div className="text-xs text-green-600 font-medium">✓</div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                
+                <div className="text-xs text-muted-foreground">
+                  📊 {Object.keys(individualFiles).length} of {searchResults.filter(r => r.status === 'found').length} products have pictures selected
                 </div>
               </div>
             )}
