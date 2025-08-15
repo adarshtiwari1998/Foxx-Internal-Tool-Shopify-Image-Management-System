@@ -823,10 +823,7 @@ async function processBatchOperations(
           continue;
         }
 
-        // For now, create a mock image URL since we need actual file upload implementation
-        const mockImageUrl = `https://example.com/batch-uploads/${batchId}/${sku}.jpg`;
-
-        // Create operation record
+        // Create operation record first
         const operation = await storage.createProductOperation({
           storeId: activeStore.id,
           batchId,
@@ -834,8 +831,6 @@ async function processBatchOperations(
           variantId: productVariant.id,
           sku,
           operationType,
-          imageUrl: mockImageUrl,
-          altText,
           status: 'pending',
           metadata: {
             sku,
@@ -844,14 +839,104 @@ async function processBatchOperations(
           },
         });
 
-        // Simulate processing (in real implementation, upload to CDN and then to Shopify)
-        await new Promise(resolve => setTimeout(resolve, 1000));
-
-        // Update operation as completed
-        await storage.updateProductOperation(operation.id, {
-          status: 'success',
-          liveUrl: mockImageUrl,
-        });
+        try {
+          // Use Shopify's staged upload system to upload the file
+          const filename = `${sku}_${Date.now()}.jpg`;
+          const mimeType = 'image/jpeg';
+          
+          console.log(`Processing ${operationType} operation for SKU: ${sku}`);
+          console.log(`Creating staged upload for ${filename}...`);
+          
+          // Step 1: Create staged upload target
+          const stagedTarget = await shopify.createStagedUpload(filename, mimeType, imageBuffer.length);
+          
+          // Step 2: Upload file to staged URL using Node.js compatible approach
+          const FormData = require('form-data');
+          const formData = new FormData();
+          
+          stagedTarget.parameters.forEach(param => {
+            formData.append(param.name, param.value);
+          });
+          formData.append('file', imageBuffer, {
+            filename: filename,
+            contentType: mimeType
+          });
+          
+          const uploadResponse = await fetch(stagedTarget.url, {
+            method: 'POST',
+            body: formData,
+            headers: formData.getHeaders(),
+          });
+          
+          if (!uploadResponse.ok) {
+            throw new Error(`Staged upload failed: ${uploadResponse.status} ${uploadResponse.statusText}`);
+          }
+          
+          // Step 3: Create file from staged upload
+          const fileResult = await shopify.createFileFromStaged(stagedTarget.resourceUrl, altText);
+          const imageUrl = fileResult.url;
+          
+          console.log(`Successfully uploaded file to Shopify: ${imageUrl}`);
+          
+          let result;
+          let previewUrl = '';
+          let liveUrl = '';
+          
+          if (operationType === 'replace' && productVariant) {
+            // Get existing image ID from the variant/product (handle GraphQL edges format)
+            const existingImageId = productVariant.image?.id || (productVariant.product?.images?.edges?.[0]?.node?.id);
+            
+            console.log(`Replacing image for variant ${productVariant.id}, existing image: ${existingImageId}`);
+            result = await shopify.replaceVariantImage(
+              productVariant.id, 
+              productVariant.product.id, 
+              imageUrl, 
+              altText,
+              existingImageId
+            );
+          } else if (operationType === 'add' && productVariant) {
+            console.log(`Adding new image to product ${productVariant.product.id}`);
+            result = await shopify.addImageToProduct(
+              productVariant.product.id, 
+              imageUrl, 
+              altText
+            );
+          }
+          
+          // Generate preview/live URLs
+          if (productVariant.product.status === 'DRAFT') {
+            try {
+              const generatedPreviewUrl = await shopify.generatePreviewLink(productVariant.product.id);
+              previewUrl = generatedPreviewUrl || '';
+            } catch (previewError) {
+              console.warn('Failed to generate preview link:', previewError);
+            }
+          } else {
+            liveUrl = shopify.getLiveProductUrl(productVariant.product.handle);
+          }
+          
+          // Update operation as successful
+          await storage.updateProductOperation(operation.id, {
+            status: 'success',
+            imageUrl: result?.url || imageUrl,
+            altText,
+            previewUrl,
+            liveUrl,
+            metadata: { ...operation.metadata, result },
+          });
+          
+          console.log(`Successfully ${operationType}d image for SKU: ${sku}`);
+        } catch (shopifyError: any) {
+          console.error(`Shopify error for SKU ${sku}:`, shopifyError);
+          
+          // Update operation as failed
+          await storage.updateProductOperation(operation.id, {
+            status: 'error',
+            errorMessage: shopifyError.message,
+          });
+          
+          throw shopifyError;
+        }
 
         completed++;
       } catch (error: any) {
