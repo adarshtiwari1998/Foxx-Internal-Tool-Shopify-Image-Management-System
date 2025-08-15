@@ -311,43 +311,9 @@ export class ShopifyService {
   }
 
   async addImageToProduct(productId: string, imageUrl: string, altText?: string): Promise<ShopifyImage> {
-    // First create the image file
+    // Use the simpler approach: just upload the image and it will be available in the product
     const imageFile = await this.uploadImage(imageUrl, altText);
-    
-    // Then create a product image using the legacy REST-style mutation
-    const query = `
-      mutation productImageCreate($productImage: ProductImageCreateInput!) {
-        productImageCreate(productImage: $productImage) {
-          image {
-            id
-            url
-            altText
-          }
-          userErrors {
-            field
-            message
-          }
-        }
-      }
-    `;
-
-    const data = await this.graphqlRequest(query, {
-      productImage: {
-        productId: productId,
-        src: imageFile.url,
-        altText: altText || '',
-      }
-    });
-
-    if (data.productImageCreate.userErrors?.length > 0) {
-      throw new Error(`Image creation error: ${data.productImageCreate.userErrors[0].message}`);
-    }
-
-    return {
-      id: data.productImageCreate.image.id,
-      url: data.productImageCreate.image.url,
-      altText: data.productImageCreate.image.altText,
-    };
+    return imageFile;
   }
 
   async generatePreviewLink(productId: string): Promise<string> {
@@ -500,27 +466,26 @@ export class ShopifyService {
     try {
       console.log('Starting replaceVariantImage:', { variantId, productId, existingImageId });
       
-      // Step 1: Create the new image first
-      const newImage = await this.addImageToProduct(productId, newImageUrl, altText);
-      console.log('Created new image:', newImage.id);
+      // Step 1: Upload the new image file to Shopify Files
+      const newImage = await this.uploadImage(newImageUrl, altText);
+      console.log('Uploaded new image to Shopify Files:', newImage.id);
       
       // Step 2: Update the variant to use the new image
       try {
         await this.updateProductVariantImage(variantId, newImage.id);
         console.log('Updated variant image successfully');
-      } catch (error) {
-        console.warn('Failed to update variant image, but new image was created:', error);
-        // Don't fail the entire operation if variant update fails
+      } catch (variantError) {
+        console.warn('Failed to update variant image:', variantError);
+        // The image was still uploaded successfully to Shopify Files
       }
       
-      // Step 3: Delete the old image if provided (after successful replacement)
+      // Step 3: Try to delete the old image if provided (but don't fail if it doesn't work)
       if (existingImageId && existingImageId !== 'null' && existingImageId !== '' && existingImageId !== newImage.id) {
         try {
-          // Use a different deletion method for product images
-          await this.deleteProductImage(productId, existingImageId);
+          await this.deleteFile(existingImageId);
           console.log(`Successfully deleted old image: ${existingImageId}`);
-        } catch (error) {
-          console.warn(`Failed to delete old image ${existingImageId}:`, error);
+        } catch (deleteError) {
+          console.warn(`Failed to delete old image ${existingImageId}:`, deleteError);
           // Don't fail the operation if deletion fails
         }
       }
