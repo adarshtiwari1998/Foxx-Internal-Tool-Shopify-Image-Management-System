@@ -6,7 +6,6 @@ import { insertStoreSchema, insertProductOperationSchema, insertBatchOperationSc
 import multer from "multer";
 import { z } from "zod";
 import JSZip from "jszip";
-import FormData from "form-data";
 
 interface MulterRequest extends Request {
   file?: Express.Multer.File;
@@ -673,12 +672,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Parse uploaded files - fix for upload.any() format
       console.log('=== FILE PARSING START ===');
-      let singleFile = null;
-      let zipFile = null;
+      let singleFile: Express.Multer.File | null = null;
+      let zipFile: Express.Multer.File | null = null;
       
       if (req.files && Array.isArray(req.files)) {
         console.log(`Files array length: ${req.files.length}`);
-        req.files.forEach((file, i) => {
+        req.files.forEach((file: Express.Multer.File, i: number) => {
           console.log(`File ${i}: fieldname='${file.fieldname}', name='${file.originalname}', size=${file.size}`);
           if (file.fieldname === 'singleFile') singleFile = file;
           if (file.fieldname === 'zipFile') zipFile = file;
@@ -1039,40 +1038,10 @@ async function processBatchOperations(
         });
 
         try {
-          // Use Shopify's staged upload system to upload the file
-          const filename = `${sku}_${Date.now()}.jpg`;
-          const mimeType = 'image/jpeg';
-          
           console.log(`Processing ${operationType} operation for SKU: ${sku}`);
-          console.log(`Creating staged upload for ${filename}...`);
           
-          // Step 1: Create staged upload target
-          const stagedTarget = await shopify.createStagedUpload(filename, mimeType, imageBuffer.length);
-          
-          // Step 2: Upload file to staged URL using Node.js compatible approach
-          const formData = new FormData();
-          
-          stagedTarget.parameters.forEach(param => {
-            formData.append(param.name, param.value);
-          });
-          formData.append('file', imageBuffer, {
-            filename: filename,
-            contentType: mimeType
-          });
-          
-          const uploadResponse = await fetch(stagedTarget.url, {
-            method: 'POST',
-            body: formData,
-            headers: formData.getHeaders(),
-          });
-          
-          if (!uploadResponse.ok) {
-            throw new Error(`Staged upload failed: ${uploadResponse.status} ${uploadResponse.statusText}`);
-          }
-          
-          // Step 3: Create file from staged upload
-          const fileResult = await shopify.createFileFromStaged(stagedTarget.resourceUrl, altText);
-          const imageUrl = fileResult.url;
+          // Use the same approach as single operations - upload the image buffer directly
+          const imageUrl = await shopify.uploadImageFromBuffer(imageBuffer, altText || `Image for ${sku}`);
           
           console.log(`Successfully uploaded file to Shopify: ${imageUrl}`);
           

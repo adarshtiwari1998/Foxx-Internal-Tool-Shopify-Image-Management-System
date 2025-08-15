@@ -674,7 +674,7 @@ export default function BulkSkuWorkflow() {
                       {/* Product Image Preview */}
                       {(result.product?.image?.url || result.product?.product?.images?.[0]?.src) && (
                         <img 
-                          src={result.product.image?.url || result.product.product.images[0].src}
+                          src={result.product.image?.url || result.product.product.images?.[0]?.src || ''}
                           alt={result.product.image?.altText || result.product.product.images?.[0]?.altText || 'Product image'}
                           className="w-12 h-12 object-cover rounded border"
                           data-testid={`image-preview-${result.sku}`}
@@ -688,7 +688,7 @@ export default function BulkSkuWorkflow() {
                             {result.product.product.title} - {result.product.title}
                           </div>
                         )}
-                        {(result.product?.image?.altText || result.product?.product?.images?.edges?.[0]?.node?.altText) && (
+                        {(result.product?.image?.altText || result.product?.product?.images?.[0]?.altText) && (
                           <div className="text-xs text-blue-600 truncate max-w-md">
                             💬 Alt: {result.product.image?.altText || (result.product.product.images?.[0]?.altText)}
                           </div>
@@ -1028,9 +1028,9 @@ export default function BulkSkuWorkflow() {
                       <div key={result.sku} className="flex items-center space-x-3 p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
                         {/* Product Image Preview */}
                         <div className="w-12 h-12 border rounded overflow-hidden flex-shrink-0">
-                          {(result.product?.image?.url || result.product?.product?.images?.edges?.[0]?.node?.url) ? (
+                          {(result.product?.image?.url || result.product?.product?.images?.[0]?.src) ? (
                             <img 
-                              src={result.product.image?.url || result.product.product.images[0].src}
+                              src={result.product.image?.url || result.product.product.images?.[0]?.src || ''}
                               alt={result.product.image?.altText || result.product.product.images?.[0]?.altText || 'Product image'}
                               className="w-full h-full object-cover"
                             />

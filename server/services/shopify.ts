@@ -655,4 +655,72 @@ export class ShopifyService {
 
     return data.product.media.edges.map((edge: any) => edge.node);
   }
+
+  // Upload image from buffer - direct upload method for bulk operations
+  async uploadImageFromBuffer(imageBuffer: Buffer, altText?: string): Promise<string> {
+    try {
+      console.log(`Uploading image buffer (${imageBuffer.length} bytes) with alt text: "${altText || 'none'}"`);
+      
+      // Determine MIME type based on buffer content
+      let mimeType = 'image/jpeg'; // default
+      if (imageBuffer.length > 4) {
+        const header = imageBuffer.toString('hex', 0, 4);
+        if (header.startsWith('89504e47')) {
+          mimeType = 'image/png';
+        } else if (header.startsWith('47494638')) {
+          mimeType = 'image/gif';
+        } else if (header.startsWith('52494646')) {
+          mimeType = 'image/webp';
+        }
+      }
+      
+      // Create a unique filename
+      const timestamp = Date.now();
+      const extension = mimeType.split('/')[1];
+      const filename = `bulk_upload_${timestamp}.${extension}`;
+      
+      console.log(`Creating staged upload for: ${filename} (${mimeType})`);
+      
+      // Step 1: Create staged upload target
+      const stagedTarget = await this.createStagedUpload(filename, mimeType, imageBuffer.length);
+      
+      console.log(`Staged upload created, uploading to: ${stagedTarget.url}`);
+      
+      // Step 2: Upload buffer to staged target
+      const formData = new FormData();
+      
+      // Add all required parameters from Shopify
+      stagedTarget.parameters.forEach(param => {
+        formData.append(param.name, param.value);
+      });
+      
+      // Create a Blob from the buffer and append as file
+      const blob = new Blob([imageBuffer], { type: mimeType });
+      formData.append('file', blob, filename);
+      
+      console.log(`Uploading ${imageBuffer.length} bytes to staged target...`);
+      const uploadResponse = await fetch(stagedTarget.url, {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (!uploadResponse.ok) {
+        throw new Error(`Staged upload failed: ${uploadResponse.status} ${uploadResponse.statusText}`);
+      }
+      
+      console.log(`File uploaded successfully to staged target`);
+      
+      // Step 3: Create file from staged upload
+      console.log(`Creating Shopify file from staged upload: ${stagedTarget.resourceUrl}`);
+      const fileResult = await this.createFileFromStaged(stagedTarget.resourceUrl, altText);
+      
+      console.log(`File created successfully with ID: ${fileResult.id}`);
+      console.log(`File URL: ${fileResult.url}`);
+      
+      return fileResult.url;
+    } catch (error) {
+      console.error('Error in uploadImageFromBuffer:', error);
+      throw error;
+    }
+  }
 }
