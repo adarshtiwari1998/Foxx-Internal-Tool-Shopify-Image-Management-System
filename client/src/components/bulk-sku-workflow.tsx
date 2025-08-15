@@ -14,6 +14,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import JSZip from "jszip";
 import { 
   Search, 
   Upload, 
@@ -64,13 +65,13 @@ export default function BulkSkuWorkflow() {
 
   // Operation state
   const [operationType, setOperationType] = useState<'replace' | 'add'>('replace');
-  const [uploadMethod, setUploadMethod] = useState<'single' | 'zip'>('single');
+  const [uploadMethod, setUploadMethod] = useState<'single' | 'zip'>('zip'); // Default to ZIP
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [zipFile, setZipFile] = useState<File | null>(null);
   const [altText, setAltText] = useState('');
 
   // Dimension state
-  const [imageDimensions, setImageDimensions] = useState({ width: '', height: '' });
+  const [imageDimensions, setImageDimensions] = useState({ width: '612', height: '612' }); // Default 612x612
   const [useCustomDimensions, setUseCustomDimensions] = useState(false);
 
   // Progress state
@@ -113,12 +114,21 @@ export default function BulkSkuWorkflow() {
       setSearchResults(results);
       setIsSearching(false);
       
+      // Auto-copy alt text from first found product if doing replacement
+      if (operationType === 'replace') {
+        const firstFound = results.find(r => r.status === 'found' && r.product);
+        if (firstFound?.product?.product?.images?.[0]?.altText) {
+          setAltText(firstFound.product.product.images[0].altText);
+        }
+      }
+      
       const found = results.filter(r => r.status === 'found').length;
       const notFound = results.filter(r => r.status === 'not_found').length;
+      const errors = results.filter(r => r.status === 'error').length;
       
       toast({
         title: "Search Complete",
-        description: `Found ${found} products, ${notFound} not found`,
+        description: `Found ${found} products, ${notFound} not found, ${errors} errors`,
       });
     },
     onError: (error: any) => {
@@ -411,11 +421,27 @@ export default function BulkSkuWorkflow() {
                       ) : (
                         <AlertCircle className="h-5 w-5 text-red-600" />
                       )}
+                      
+                      {/* Product Image Preview */}
+                      {result.product?.product?.images?.[0]?.src && (
+                        <img 
+                          src={result.product.product.images[0].src}
+                          alt={result.product.product.images[0].altText || 'Product image'}
+                          className="w-12 h-12 object-cover rounded border"
+                          data-testid={`image-preview-${result.sku}`}
+                        />
+                      )}
+                      
                       <div>
-                        <div className="font-mono text-sm">{result.sku}</div>
+                        <div className="font-mono text-sm font-medium">{result.sku}</div>
                         {result.product && (
                           <div className="text-sm text-muted-foreground">
                             {result.product.product.title} - {result.product.title}
+                          </div>
+                        )}
+                        {result.product?.product?.images?.[0]?.altText && (
+                          <div className="text-xs text-blue-600 truncate max-w-md">
+                            Alt: {result.product.product.images[0].altText}
                           </div>
                         )}
                         {result.error && (
@@ -565,46 +591,73 @@ export default function BulkSkuWorkflow() {
 
             {/* Dimensions */}
             <div className="space-y-3">
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="custom-dimensions"
-                  checked={useCustomDimensions}
-                  onCheckedChange={(checked) => setUseCustomDimensions(checked === true)}
-                />
-                <Label htmlFor="custom-dimensions">Use custom dimensions for all images</Label>
-              </div>
-
-              {useCustomDimensions && (
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="width">Width (px)</Label>
-                    <Select value={imageDimensions.width} onValueChange={(value) => 
-                      setImageDimensions(prev => ({ ...prev, width: value }))
-                    }>
-                      <SelectTrigger data-testid="select-width">
-                        <SelectValue placeholder="Select width" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {[300, 400, 500, 600, 800, 1000, 1200, 1500, 2000].map(size => (
-                          <SelectItem key={size} value={size.toString()}>{size}px</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+              <Label className="text-base font-medium">Image Dimensions</Label>
+              
+              {/* Default dimensions display */}
+              {!useCustomDimensions && (
+                <div className="p-3 bg-gray-50 dark:bg-gray-900 rounded-lg border">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">Default: 612 × 612 pixels</span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setUseCustomDimensions(true)}
+                      data-testid="button-custom-dimensions"
+                    >
+                      Customize
+                    </Button>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="height">Height (px)</Label>
-                    <Select value={imageDimensions.height} onValueChange={(value) => 
-                      setImageDimensions(prev => ({ ...prev, height: value }))
-                    }>
-                      <SelectTrigger data-testid="select-height">
-                        <SelectValue placeholder="Select height" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {[300, 400, 500, 600, 800, 1000, 1200, 1500, 2000].map(size => (
-                          <SelectItem key={size} value={size.toString()}>{size}px</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                </div>
+              )}
+              
+              {useCustomDimensions && (
+                <div className="space-y-4 p-4 border rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-medium">Custom Dimensions</Label>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setUseCustomDimensions(false);
+                        setImageDimensions({ width: '612', height: '612' });
+                      }}
+                      data-testid="button-reset-dimensions"
+                    >
+                      Reset to Default
+                    </Button>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="width">Width (px)</Label>
+                      <Select value={imageDimensions.width} onValueChange={(value) => 
+                        setImageDimensions(prev => ({ ...prev, width: value }))
+                      }>
+                        <SelectTrigger data-testid="select-width">
+                          <SelectValue placeholder="Select width" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {[300, 400, 500, 600, 800, 1000, 1200, 1500, 2000].map(size => (
+                            <SelectItem key={size} value={size.toString()}>{size}px</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="height">Height (px)</Label>
+                      <Select value={imageDimensions.height} onValueChange={(value) => 
+                        setImageDimensions(prev => ({ ...prev, height: value }))
+                      }>
+                        <SelectTrigger data-testid="select-height">
+                          <SelectValue placeholder="Select height" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {[300, 400, 500, 600, 800, 1000, 1200, 1500, 2000].map(size => (
+                            <SelectItem key={size} value={size.toString()}>{size}px</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                 </div>
               )}

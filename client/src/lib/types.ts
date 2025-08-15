@@ -22,6 +22,11 @@ export interface ProductVariant {
     title: string;
     handle: string;
     status: string;
+    images?: {
+      id: string;
+      src: string;
+      altText?: string;
+    }[];
   };
 }
 
