@@ -314,9 +314,14 @@ export class ShopifyService {
     }
 
     const mediaImage = data.productCreateMedia.media[0];
+    console.log('Created media response:', JSON.stringify(mediaImage, null, 2));
+    
+    // Handle the case where image might be null or undefined
+    const resultImageUrl = mediaImage.image?.url || imageUrl; // fallback to original URL
+    
     return {
       id: mediaImage.id,
-      url: mediaImage.image.url,
+      url: resultImageUrl,
       altText: mediaImage.alt,
     };
   }
