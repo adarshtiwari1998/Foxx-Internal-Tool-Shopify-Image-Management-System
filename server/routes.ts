@@ -707,22 +707,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (uploadMethod === 'zip' && zipFile) {
         // Extract ZIP file
+        console.log(`Processing ZIP file: ${zipFile.originalname} (${zipFile.size} bytes)`);
         const zipBuffer = zipFile.buffer;
         const zip = new JSZip();
         const zipContent = await zip.loadAsync(zipBuffer);
         
-        // Extract files and match by SKU
+        console.log(`ZIP extracted successfully. Found ${Object.keys(zipContent.files).length} files.`);
+        
+        // Extract files and match by SKU with flexible matching
         for (const [filename, file] of Object.entries(zipContent.files)) {
           if (!file.dir && /\.(jpg|jpeg|png|webp)$/i.test(filename)) {
-            const baseName = filename.split('.')[0];
-            const matchingSku = skus.find((sku: string) => 
-              baseName.toLowerCase() === sku.toLowerCase()
-            );
+            // Get filename without path and extension
+            const fileBaseName = filename.split('/').pop()?.split('.')[0] || '';
+            
+            // Try multiple matching strategies
+            let matchingSku = skus.find((sku: string) => {
+              const skuClean = sku.toLowerCase().trim();
+              const fileClean = fileBaseName.toLowerCase().trim();
+              
+              // Exact match
+              if (fileClean === skuClean) return true;
+              
+              // Remove common separators and match
+              const skuNormalized = skuClean.replace(/[-_\s]/g, '');
+              const fileNormalized = fileClean.replace(/[-_\s]/g, '');
+              if (fileNormalized === skuNormalized) return true;
+              
+              // Check if filename contains the SKU
+              if (fileClean.includes(skuClean)) return true;
+              
+              // Check if SKU contains the filename (for short filenames)
+              if (skuClean.includes(fileClean) && fileClean.length > 2) return true;
+              
+              return false;
+            });
             
             if (matchingSku) {
+              console.log(`Matched file "${filename}" to SKU "${matchingSku}"`);
               imageFiles[matchingSku] = await file.async('nodebuffer');
+            } else {
+              console.warn(`Could not match file "${filename}" to any SKU. Available SKUs: ${skus.join(', ')}`);
             }
           }
+        }
+        
+        console.log(`ZIP processing complete. Matched ${Object.keys(imageFiles).length} images to SKUs out of ${skus.length} requested SKUs.`);
+        if (Object.keys(imageFiles).length === 0) {
+          console.warn('No images were matched! This will cause all operations to fail.');
         }
       } else if (uploadMethod === 'single' && singleFile) {
         // Use single file for all SKUs
@@ -809,6 +840,14 @@ async function processBatchOperations(
         const imageBuffer = imageFiles[sku];
         if (!imageBuffer) {
           failed++;
+          const errorMessage = uploadMethod === 'zip' 
+            ? `No matching image found in ZIP for SKU "${sku}". Make sure the image filename matches or contains the SKU.`
+            : uploadMethod === 'individual'
+            ? `No individual image file provided for SKU "${sku}".`
+            : `No image provided for SKU "${sku}".`;
+            
+          console.warn(`Skipping SKU ${sku}: ${errorMessage}`);
+          
           await storage.createProductOperation({
             storeId: activeStore.id,
             batchId,
@@ -817,8 +856,13 @@ async function processBatchOperations(
             sku,
             operationType,
             status: 'error',
-            errorMessage: 'No image provided for this SKU',
-            metadata: { sku },
+            errorMessage,
+            metadata: { 
+              sku,
+              uploadMethod,
+              availableImages: Object.keys(imageFiles),
+              totalImagesInBatch: Object.keys(imageFiles).length
+            },
           });
           continue;
         }
