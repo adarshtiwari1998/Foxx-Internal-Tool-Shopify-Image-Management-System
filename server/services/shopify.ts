@@ -312,12 +312,21 @@ export class ShopifyService {
 
   async addImageToProduct(productId: string, imageUrl: string, altText?: string): Promise<ShopifyImage> {
     const query = `
-      mutation productImageCreate($productId: ID!, $image: ImageInput!) {
-        productImageCreate(productId: $productId, image: $image) {
-          image {
+      mutation productUpdate($product: ProductUpdateInput!, $media: [CreateMediaInput!]!) {
+        productUpdate(product: $product, media: $media) {
+          product {
             id
-            url
-            altText
+            media(first: 1) {
+              nodes {
+                ... on MediaImage {
+                  id
+                  image {
+                    url
+                  }
+                  alt
+                }
+              }
+            }
           }
           userErrors {
             field
@@ -328,18 +337,28 @@ export class ShopifyService {
     `;
 
     const data = await this.graphqlRequest(query, {
-      productId,
-      image: {
-        src: imageUrl,
-        altText: altText || '',
+      product: {
+        id: productId,
       },
+      media: [{
+        originalSource: imageUrl,
+        alt: altText || '',
+        mediaContentType: "IMAGE"
+      }]
     });
 
-    if (data.productImageCreate.userErrors?.length > 0) {
-      throw new Error(`Image creation error: ${data.productImageCreate.userErrors[0].message}`);
+    if (data.productUpdate.userErrors?.length > 0) {
+      throw new Error(`Image creation error: ${data.productUpdate.userErrors[0].message}`);
     }
 
-    return data.productImageCreate.image;
+    // Get the newly added media
+    const newMedia = data.productUpdate.product.media.nodes[0];
+    
+    return {
+      id: newMedia.id,
+      url: newMedia.image.url,
+      altText: newMedia.alt,
+    };
   }
 
   async generatePreviewLink(productId: string): Promise<string> {
