@@ -2,7 +2,14 @@
 
 This is a Shopify Image Management System built for internal tools at Foxx Life Sciences. The application allows users to manage product images across multiple Shopify stores, supporting operations like image replacement, addition, and updates. It provides a comprehensive interface for searching products by SKU or URL, uploading images, and tracking operation results.
 
-## Recent Changes (August 14, 2025)
+## Recent Changes (August 15, 2025)
+- ✓ Successfully migrated from Replit Agent to standard Replit environment
+- ✓ Improved Store Configuration UI with collapsible design to save space
+- ✓ Added "Add Store" button that only shows full form when needed
+- ✓ Enhanced user experience with compact store management interface
+- ✓ Maintained all existing functionality while reducing visual clutter
+
+## Previous Changes (August 14, 2025)
 - ✓ Migrated from Neon Database to Render PostgreSQL for production stability
 - ✓ Updated database configuration with SSL support for secure connections
 - ✓ Fixed TypeScript issues in routes and Shopify service

@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
-import { Globe, Key, Plug, Save, Circle } from "lucide-react";
+import { Globe, Key, Plug, Save, Circle, Plus, ChevronDown, ChevronUp } from "lucide-react";
 import type { Store } from "@/lib/types";
 
 const storeSchema = z.object({
@@ -22,11 +22,16 @@ type StoreFormData = z.infer<typeof storeSchema>;
 
 export default function StoreConfiguration() {
   const [isConnecting, setIsConnecting] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const { data: activeStore } = useQuery<Store | null>({
     queryKey: ["/api/stores/active"],
+  });
+
+  const { data: stores = [] } = useQuery<Store[]>({
+    queryKey: ["/api/stores"],
   });
 
   const form = useForm<StoreFormData>({
@@ -51,6 +56,7 @@ export default function StoreConfiguration() {
       queryClient.invalidateQueries({ queryKey: ["/api/stores"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stores/active"] });
       form.reset();
+      setIsExpanded(false);
     },
     onError: (error: any) => {
       toast({
@@ -70,12 +76,65 @@ export default function StoreConfiguration() {
     }
   };
 
+  // Show collapsed view when stores exist and form is not expanded
+  if (stores.length > 0 && !isExpanded) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center">
+              <Globe className="mr-2 h-5 w-5 text-foxx-blue" />
+              Store Configuration
+            </div>
+            <div className="flex items-center space-x-3">
+              <div className="text-sm text-gray-500">
+                <span className="inline-flex items-center" data-testid="status-connection">
+                  <Circle 
+                    className={`mr-1 h-2 w-2 ${
+                      activeStore ? 'text-green-500 fill-current' : 'text-red-500 fill-current'
+                    }`} 
+                  />
+                  {activeStore ? 'Connected' : 'Disconnected'}
+                </span>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsExpanded(true)}
+                className="flex items-center"
+                data-testid="button-add-store"
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Add Store
+              </Button>
+            </div>
+          </CardTitle>
+        </CardHeader>
+      </Card>
+    );
+  }
+
+  // Show full form when no stores exist or when expanded
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center">
-          <Globe className="mr-2 h-5 w-5 text-foxx-blue" />
-          Store Configuration
+        <CardTitle className="flex items-center justify-between">
+          <div className="flex items-center">
+            <Globe className="mr-2 h-5 w-5 text-foxx-blue" />
+            Store Configuration
+          </div>
+          {stores.length > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsExpanded(false)}
+              className="flex items-center"
+              data-testid="button-collapse-form"
+            >
+              <ChevronUp className="h-4 w-4" />
+              Collapse
+            </Button>
+          )}
         </CardTitle>
         <CardDescription>
           Configure Shopify store credentials for API access
