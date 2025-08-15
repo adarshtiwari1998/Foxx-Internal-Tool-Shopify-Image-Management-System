@@ -1,10 +1,13 @@
 import { 
   stores, 
   productOperations,
+  batchOperations,
   type Store, 
   type InsertStore,
   type ProductOperation,
   type InsertProductOperation,
+  type BatchOperation,
+  type InsertBatchOperation,
   type User, 
   type InsertUser 
 } from "@shared/schema";
@@ -33,6 +36,13 @@ export interface IStorage {
   getProductOperation(id: string): Promise<ProductOperation | undefined>;
   getProductOperationsByStore(storeId: string): Promise<ProductOperation[]>;
   getRecentProductOperations(limit?: number): Promise<ProductOperation[]>;
+
+  // Batch operation methods
+  createBatchOperation(batch: InsertBatchOperation): Promise<BatchOperation>;
+  updateBatchOperation(id: string, batch: Partial<InsertBatchOperation>): Promise<BatchOperation | undefined>;
+  getBatchOperation(id: string): Promise<BatchOperation | undefined>;
+  getBatchOperationsByStore(storeId: string): Promise<BatchOperation[]>;
+  getBatchOperationsByBatch(batchId: string): Promise<ProductOperation[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -138,6 +148,56 @@ export class DatabaseStorage implements IStorage {
       .from(productOperations)
       .orderBy(desc(productOperations.createdAt))
       .limit(limit);
+  }
+
+  // Batch operation methods
+  async createBatchOperation(batch: InsertBatchOperation): Promise<BatchOperation> {
+    const [newBatch] = await db
+      .insert(batchOperations)
+      .values({
+        ...batch,
+        updatedAt: new Date(),
+      })
+      .returning();
+    return newBatch;
+  }
+
+  async updateBatchOperation(id: string, batch: Partial<InsertBatchOperation>): Promise<BatchOperation | undefined> {
+    const [updatedBatch] = await db
+      .update(batchOperations)
+      .set({
+        ...batch,
+        updatedAt: new Date(),
+      })
+      .where(eq(batchOperations.id, id))
+      .returning();
+    return updatedBatch || undefined;
+  }
+
+  async getBatchOperation(id: string): Promise<BatchOperation | undefined> {
+    const [batch] = await db
+      .select()
+      .from(batchOperations)
+      .where(eq(batchOperations.id, id));
+    return batch || undefined;
+  }
+
+  async getBatchOperationsByStore(storeId: string): Promise<BatchOperation[]> {
+    const batches = await db
+      .select()
+      .from(batchOperations)
+      .where(eq(batchOperations.storeId, storeId))
+      .orderBy(desc(batchOperations.createdAt));
+    return batches;
+  }
+
+  async getBatchOperationsByBatch(batchId: string): Promise<ProductOperation[]> {
+    const operations = await db
+      .select()
+      .from(productOperations)
+      .where(eq(productOperations.batchId, batchId))
+      .orderBy(desc(productOperations.createdAt));
+    return operations;
   }
 }
 

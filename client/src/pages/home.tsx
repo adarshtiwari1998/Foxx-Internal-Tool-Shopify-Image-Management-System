@@ -1,12 +1,17 @@
 
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import StoreConfiguration from "@/components/store-configuration";
 import UnifiedImageWorkflow from "@/components/unified-image-workflow";
+import BulkSkuWorkflow from "@/components/bulk-sku-workflow";
 import ActionResults from "@/components/action-results";
 import HeaderStoreSwitcher from "@/components/header-store-switcher";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Package, Layers } from "lucide-react";
 import type { Store } from "@/lib/types";
 
 export default function Home() {
+  const [activeTab, setActiveTab] = useState('single');
 
   const { data: activeStore } = useQuery<Store | null>({
     queryKey: ["/api/stores/active"],
@@ -45,11 +50,30 @@ export default function Home() {
           <StoreConfiguration />
         </div>
 
-        {/* Main Content - Unified Workflow */}
+        {/* Main Content - Workflow Tabs */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Main Workflow - Takes 2 columns */}
           <div className="lg:col-span-2 space-y-6">
-            <UnifiedImageWorkflow />
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="single" className="flex items-center space-x-2" data-testid="tab-single">
+                  <Package className="h-4 w-4" />
+                  <span>Single SKU</span>
+                </TabsTrigger>
+                <TabsTrigger value="bulk" className="flex items-center space-x-2" data-testid="tab-bulk">
+                  <Layers className="h-4 w-4" />
+                  <span>Bulk SKUs (up to 30)</span>
+                </TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="single" className="mt-6">
+                <UnifiedImageWorkflow />
+              </TabsContent>
+              
+              <TabsContent value="bulk" className="mt-6">
+                <BulkSkuWorkflow />
+              </TabsContent>
+            </Tabs>
           </div>
 
           {/* Right Column - Results and History */}
