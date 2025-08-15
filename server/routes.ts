@@ -670,16 +670,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const singleFile = (req.files as any)?.singleFile?.[0];
       const zipFile = (req.files as any)?.zipFile?.[0];
       
-      // Parse individual files
+      // Parse individual files - improved handling
       const individualFiles: {[sku: string]: any} = {};
       if (uploadMethod === 'individual') {
-        for (let i = 0; i < 30; i++) {
-          const file = (req.files as any)?.[`individualFile_${i}`]?.[0];
-          const sku = req.body[`individualSku_${i}`];
-          if (file && sku) {
-            individualFiles[sku] = file;
+        console.log(`Processing individual files for ${skus.length} SKUs...`);
+        
+        // Check if files were uploaded using the individual file input method
+        if (req.files && Array.isArray(req.files)) {
+          // Handle when files are uploaded with specific field names
+          for (let i = 0; i < 30; i++) {
+            const fieldName = `individualFile_${i}`;
+            const file = (req.files as any).find((f: any) => f.fieldname === fieldName);
+            const sku = req.body[`individualSku_${i}`];
+            if (file && sku) {
+              console.log(`Found individual file for SKU ${sku}: ${file.originalname}`);
+              individualFiles[sku] = file;
+            }
           }
+        } else if (req.files) {
+          // Handle when files are uploaded as object with field names as keys
+          Object.keys(req.files).forEach(fieldName => {
+            if (fieldName.startsWith('individualFile_')) {
+              const index = fieldName.replace('individualFile_', '');
+              const file = (req.files as any)[fieldName][0];
+              const sku = req.body[`individualSku_${index}`];
+              if (file && sku) {
+                console.log(`Found individual file for SKU ${sku}: ${file.originalname}`);
+                individualFiles[sku] = file;
+              }
+            }
+          });
         }
+        
+        console.log(`Individual files processed: ${Object.keys(individualFiles).length} files for SKUs: [${Object.keys(individualFiles).join(', ')}]`);
       }
 
       const activeStore = await storage.getActiveStore();
@@ -714,18 +737,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         console.log(`ZIP extracted successfully. Found ${Object.keys(zipContent.files).length} files.`);
         
-        // Extract files and match by SKU with flexible matching
+        // Extract files and match by SKU with flexible matching (ignore extensions)
         for (const [filename, file] of Object.entries(zipContent.files)) {
           if (!file.dir && /\.(jpg|jpeg|png|webp)$/i.test(filename)) {
             // Get filename without path and extension
             const fileBaseName = filename.split('/').pop()?.split('.')[0] || '';
             
-            // Try multiple matching strategies
+            // Try multiple matching strategies - ONLY match SKU part, ignore extensions completely
             let matchingSku = skus.find((sku: string) => {
               const skuClean = sku.toLowerCase().trim();
               const fileClean = fileBaseName.toLowerCase().trim();
               
-              // Exact match
+              // Exact match (ignore case)
               if (fileClean === skuClean) return true;
               
               // Remove common separators and match
@@ -733,20 +756,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
               const fileNormalized = fileClean.replace(/[-_\s]/g, '');
               if (fileNormalized === skuNormalized) return true;
               
-              // Check if filename contains the SKU
-              if (fileClean.includes(skuClean)) return true;
+              // Check if filename starts with SKU (good for files like "SKU-001_image1.jpg")
+              if (fileClean.startsWith(skuClean)) return true;
               
-              // Check if SKU contains the filename (for short filenames)
-              if (skuClean.includes(fileClean) && fileClean.length > 2) return true;
+              // Check if filename contains the full SKU surrounded by separators or at start/end
+              const regex = new RegExp(`(^|[-_\s])${escapeRegex(skuClean)}([-_\s]|$)`, 'i');
+              if (regex.test(fileClean)) return true;
               
               return false;
             });
             
             if (matchingSku) {
-              console.log(`Matched file "${filename}" to SKU "${matchingSku}"`);
+              console.log(`✓ Matched file "${filename}" to SKU "${matchingSku}"`);
               imageFiles[matchingSku] = await file.async('nodebuffer');
             } else {
-              console.warn(`Could not match file "${filename}" to any SKU. Available SKUs: ${skus.join(', ')}`);
+              console.warn(`✗ Could not match file "${filename}" to any SKU. File base: "${fileBaseName}", Available SKUs: [${skus.join(', ')}]`);
             }
           }
         }
@@ -763,13 +787,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       } else if (uploadMethod === 'individual' && Object.keys(individualFiles).length > 0) {
         // Use individual files for each SKU
+        console.log(`Processing individual files for ${Object.keys(individualFiles).length} SKUs...`);
         Object.entries(individualFiles).forEach(([sku, file]) => {
-          imageFiles[sku] = file.buffer;
+          if (file && file.buffer) {
+            console.log(`Adding image buffer for SKU ${sku}: ${file.originalname} (${file.size} bytes)`);
+            imageFiles[sku] = file.buffer;
+          } else {
+            console.warn(`Invalid file object for SKU ${sku}:`, file);
+          }
         });
+        console.log(`Individual files processed: ${Object.keys(imageFiles).length} image buffers ready`);
       }
 
       // Start async processing
-      processBatchOperations(batch.id, skus, imageFiles, operationType, altText, dimensions, activeStore);
+      processBatchOperations(batch.id, skus, imageFiles, operationType, uploadMethod, altText, dimensions, activeStore);
 
       res.json(batch);
     } catch (error: any) {
@@ -796,12 +827,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   return httpServer;
 }
 
+// Helper function to escape regex special characters
+function escapeRegex(string: string) {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 // Async batch processing function
 async function processBatchOperations(
   batchId: string,
   skus: string[],
   imageFiles: { [sku: string]: Buffer },
   operationType: string,
+  uploadMethod: string,
   altText: string,
   dimensions: any,
   activeStore: any
@@ -858,8 +895,8 @@ async function processBatchOperations(
             status: 'error',
             errorMessage,
             metadata: { 
-              sku,
-              uploadMethod,
+              sku: sku,
+              uploadMethod: uploadMethod,
               availableImages: Object.keys(imageFiles),
               totalImagesInBatch: Object.keys(imageFiles).length
             },
@@ -877,8 +914,8 @@ async function processBatchOperations(
           operationType,
           status: 'pending',
           metadata: {
-            sku,
-            dimensions,
+            sku: sku,
+            dimensions: dimensions,
             filename: `${sku}_${dimensions?.width || 'auto'}x${dimensions?.height || 'auto'}_${productVariant.product.title.split(' ').slice(0, 3).join('_')}.jpg`
           },
         });
