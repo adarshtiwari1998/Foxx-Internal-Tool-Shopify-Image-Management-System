@@ -5,20 +5,23 @@ This is a Shopify Image Management System built for internal tools at Foxx Life 
 ## Recent Changes (August 15, 2025)
 - ✓ **Successfully completed migration from Replit Agent to standard Replit environment**
 - ✓ **Fixed critical image replacement errors** by updating to modern Shopify GraphQL API:
-  - **MAJOR FIX**: Replaced deprecated `productImageCreate` mutation with modern `productUpdateMedia`
-  - **MAJOR FIX**: Replaced deprecated `productImageDelete` with modern `productDeleteMedia`
+  - **MAJOR FIX**: Replaced deprecated `productImageCreate` mutation with modern `productCreateMedia`
+  - **MAJOR FIX**: Replaced deprecated `productImageDelete` with modern `productDeleteMedia`  
   - Updated to use current Shopify API specifications as per official documentation
   - Fixed GraphQL syntax errors caused by outdated mutation types
   - Images now properly attach to products using supported media operations
   - Enhanced error handling and logging for better debugging
-- ✓ **Improved image replacement logic** to handle variant images properly:
-  - Fixed replaceVariantImage method to create product media first
+- ✓ **Implemented proper image replacement vs add new logic**:
+  - **TRUE REPLACEMENT**: "Replace existing image" now DELETES old image first, then adds new one
+  - **ADD NEW**: "Add new image" only adds without deleting anything
+  - Fixed misleading "uploaded to Shopify" message during file staging - now shows "ready for processing"
+  - Clear distinction between file staging and actual Shopify operations
+  - Enhanced logging to show delete-first, add-second behavior for replacements
+- ✓ **Fixed null reference errors and API compatibility issues**:
   - Resolved "invalid id" errors by understanding Shopify media vs image ID differences
   - Added proper null checking for media creation responses
   - Images are successfully created as product media and attached to products
-  - Implemented proper cleanup of old media after successful replacement
   - Note: Variant-specific image assignment is limited by current Shopify API capabilities
-- ✓ Fixed image replacement RESOURCE_NOT_FOUND error by improving error handling
 - ✓ Added support for draft product preview links in operation results
 - ✓ Updated frontend to pass correct data structure (SKU, existing image ID)
 - ✓ Improved Store Configuration UI with collapsible design to save space

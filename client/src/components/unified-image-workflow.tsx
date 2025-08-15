@@ -149,8 +149,8 @@ export default function UnifiedImageWorkflow() {
     onSuccess: (stagedUrl: string) => {
       setImageSource(stagedUrl);
       toast({
-        title: "Upload Complete",
-        description: "Image uploaded successfully to Shopify",
+        title: "File Ready",
+        description: "Image uploaded and ready for processing",
       });
     },
     onError: (error: any) => {

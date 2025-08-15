@@ -335,7 +335,8 @@ export class ShopifyService {
   }
 
   async addImageToProduct(productId: string, imageUrl: string, altText?: string): Promise<ShopifyImage> {
-    // Create a proper product media that gets attached to the product
+    // Create a proper product media that gets attached to the product (ADD ONLY - no deletion)
+    console.log('Adding new image without deleting anything:', { productId, imageUrl });
     return await this.createProductMediaFromUrl(productId, imageUrl, altText);
   }
 
@@ -472,28 +473,29 @@ export class ShopifyService {
 
   async replaceVariantImage(variantId: string, productId: string, newImageUrl: string, altText?: string, existingImageId?: string): Promise<ShopifyImage> {
     try {
-      console.log('Starting replaceVariantImage:', { variantId, productId, existingImageId });
+      console.log('Starting replaceVariantImage (DELETE FIRST, THEN ADD):', { variantId, productId, existingImageId });
       
-      // Step 1: Create a new product media (this attaches it to the product automatically)
-      const newImage = await this.createProductMediaFromUrl(productId, newImageUrl, altText);
-      console.log('Created new product media:', newImage.id);
-      
-      // Step 2: Try to update the variant to use the new image
-      // Note: Current Shopify API makes it difficult to assign specific media to variants
-      // The image is already attached to the product and will be available
-      const variantUpdated = await this.updateProductVariantImage(variantId, newImage.id);
-      console.log('Product media created successfully - image is now available on the product');
-      
-      // Step 3: Delete the old image if provided and different from new one
-      if (existingImageId && existingImageId !== 'null' && existingImageId !== '' && existingImageId !== newImage.id) {
+      // STEP 1: DELETE the old image FIRST for true replacement behavior
+      if (existingImageId && existingImageId !== 'null' && existingImageId !== '') {
         try {
+          console.log(`Deleting old image first: ${existingImageId}`);
           await this.deleteProductMedia(productId, existingImageId);
           console.log(`Successfully deleted old product image: ${existingImageId}`);
         } catch (deleteError) {
           console.warn(`Failed to delete old image ${existingImageId}:`, deleteError);
-          // Don't fail the operation if deletion fails
+          // Continue with adding new image even if deletion fails
         }
       }
+      
+      // STEP 2: Create the new product media (this attaches it to the product automatically)
+      const newImage = await this.createProductMediaFromUrl(productId, newImageUrl, altText);
+      console.log('Created new product media after deletion:', newImage.id);
+      
+      // STEP 3: Try to update the variant to use the new image
+      // Note: Current Shopify API makes it difficult to assign specific media to variants
+      // The image is already attached to the product and will be available
+      const variantUpdated = await this.updateProductVariantImage(variantId, newImage.id);
+      console.log('Image replacement completed - old deleted, new added');
       
       return newImage;
     } catch (error) {
