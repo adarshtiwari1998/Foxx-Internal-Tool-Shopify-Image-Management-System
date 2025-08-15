@@ -667,21 +667,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const dimensions = req.body.dimensions ? JSON.parse(req.body.dimensions) : undefined;
       
       // Parse uploaded files
-      const singleFile = req.files?.find((f: any) => f.fieldname === 'singleFile');
-      const zipFile = req.files?.find((f: any) => f.fieldname === 'zipFile');
+      const singleFile = (req.files as any)?.singleFile?.[0];
+      const zipFile = (req.files as any)?.zipFile?.[0];
       
       // Parse individual files
       const individualFiles: {[sku: string]: any} = {};
       if (uploadMethod === 'individual') {
-        req.files?.forEach((file: any) => {
-          if (file.fieldname.startsWith('individualFile_')) {
-            const index = file.fieldname.split('_')[1];
-            const sku = req.body[`individualSku_${index}`];
-            if (sku) {
-              individualFiles[sku] = file;
-            }
+        for (let i = 0; i < 30; i++) {
+          const file = (req.files as any)?.[`individualFile_${i}`]?.[0];
+          const sku = req.body[`individualSku_${i}`];
+          if (file && sku) {
+            individualFiles[sku] = file;
           }
-        });
+        }
       }
 
       const activeStore = await storage.getActiveStore();
