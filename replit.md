@@ -3,6 +3,12 @@
 This is a Shopify Image Management System built for internal tools at Foxx Life Sciences. The application allows users to manage product images across multiple Shopify stores, supporting operations like image replacement, addition, and updates. It provides a comprehensive interface for searching products by SKU or URL, uploading images, and tracking operation results.
 
 ## Recent Changes (August 15, 2025)
+- ✅ **MAJOR FIX: File extension conversion now works correctly for ALL upload methods**:
+  - **Fixed bulk operations**: Images now properly convert to selected format (PNG, JPEG, WebP)
+  - **Fixed filename generation**: Bulk uploads now use correct file extension in filenames
+  - **Enhanced single uploads**: File extension parameter now passed through all workflows
+  - **Consistent behavior**: All upload methods (ZIP, single file, individual files) now respect user's file format selection
+  - **Technical details**: Updated `processBatchOperations` function to use `fileExtension` parameter in filename generation and MIME type conversion
 - ✓ **Successfully completed migration from Replit Agent to standard Replit environment**
 - ✓ **Fixed critical image replacement errors** by updating to modern Shopify GraphQL API:
   - **MAJOR FIX**: Replaced deprecated `productImageCreate` mutation with modern `productCreateMedia`

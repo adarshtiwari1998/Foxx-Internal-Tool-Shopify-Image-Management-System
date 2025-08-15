@@ -141,6 +141,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         productId: z.string().optional(),
         sku: z.string().optional(),
         existingImageId: z.string().optional(),
+        fileExtension: z.string().optional(), // Add file extension support
       });
 
       const data = schema.parse(req.body);
@@ -1024,7 +1025,7 @@ async function processBatchOperations(
         }
 
         // Generate proper filename using same logic as single upload
-        const generateBulkImageFilename = (sku: string, productTitle: string, dimensions?: any) => {
+        const generateBulkImageFilename = (sku: string, productTitle: string, dimensions?: any, fileExtension: string = 'png') => {
           const productTitleShort = productTitle
             .split(' ')
             .slice(0, 3) // First 3 words of title
@@ -1036,7 +1037,10 @@ async function processBatchOperations(
             ? `${dimensions.width}x${dimensions.height}`
             : '640x640';
           
-          return `${sku}_${dimensionStr}_${productTitleShort}.jpg`;
+          // Use the correct file extension based on user selection
+          const extension = fileExtension === 'jpeg' ? 'jpg' : fileExtension;
+          
+          return `${sku}_${dimensionStr}_${productTitleShort}.${extension}`;
         };
 
         // Determine alt text - copy existing if available, otherwise use default
@@ -1061,7 +1065,7 @@ async function processBatchOperations(
           metadata: {
             sku: sku,
             dimensions: dimensions,
-            filename: generateBulkImageFilename(sku, productVariant.product.title, dimensions)
+            filename: generateBulkImageFilename(sku, productVariant.product.title, dimensions, fileExtension)
           },
         });
 
@@ -1095,7 +1099,7 @@ async function processBatchOperations(
               productVariant.product.id, 
               imageBuffer, 
               altTextToUse,
-              generateBulkImageFilename(sku, productVariant.product.title, dimensions),
+              generateBulkImageFilename(sku, productVariant.product.title, dimensions, fileExtension),
               fileExtension
             );
             
@@ -1105,7 +1109,7 @@ async function processBatchOperations(
               productVariant.product.id, 
               imageBuffer, 
               altTextToUse,
-              generateBulkImageFilename(sku, productVariant.product.title, dimensions),
+              generateBulkImageFilename(sku, productVariant.product.title, dimensions, fileExtension),
               fileExtension
             );
           }

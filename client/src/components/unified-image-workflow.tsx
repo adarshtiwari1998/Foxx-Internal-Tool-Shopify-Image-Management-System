@@ -267,6 +267,7 @@ export default function UnifiedImageWorkflow() {
       productId: productData.product.id,
       sku: productData.sku,
       existingImageId: productData.image?.id,
+      fileExtension: fileExtension, // Pass the selected file extension
     };
 
     imageOperationMutation.mutate(operationData);
