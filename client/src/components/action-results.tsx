@@ -21,10 +21,21 @@ export default function ActionResults() {
 
   // Delete single operation mutation
   const deleteOperationMutation = useMutation({
-    mutationFn: (operationId: string) => 
-      apiRequest(`/api/operations/${operationId}`, {
-        method: 'DELETE'
-      }),
+    mutationFn: async (operationId: string) => {
+      const response = await fetch(`/api/operations/${operationId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Delete failed');
+      }
+      
+      return response.json();
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/operations"] });
       toast({
@@ -43,11 +54,22 @@ export default function ActionResults() {
 
   // Bulk delete mutation
   const bulkDeleteMutation = useMutation({
-    mutationFn: (operationIds: string[]) => 
-      apiRequest('/api/operations/bulk-delete', {
+    mutationFn: async (operationIds: string[]) => {
+      const response = await fetch('/api/operations/bulk-delete', {
         method: 'POST',
-        body: { operationIds }
-      }),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ operationIds }),
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Bulk delete failed');
+      }
+      
+      return response.json();
+    },
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/operations"] });
       setSelectedOperations(new Set());
@@ -67,10 +89,21 @@ export default function ActionResults() {
 
   // Clear all operations mutation
   const clearAllMutation = useMutation({
-    mutationFn: () => 
-      apiRequest('/api/operations', {
-        method: 'DELETE'
-      }),
+    mutationFn: async () => {
+      const response = await fetch('/api/operations', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Clear all failed');
+      }
+      
+      return response.json();
+    },
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/operations"] });
       setSelectedOperations(new Set());
