@@ -29,7 +29,8 @@ import {
   Plus,
   Replace,
   X,
-  Download
+  Download,
+  Globe
 } from "lucide-react";
 import type { ProductVariant } from "@/lib/types";
 
@@ -59,16 +60,19 @@ export default function BulkSkuWorkflow() {
 
   // Bulk SKU state
   const [skuList, setSkuList] = useState('');
+  const [inputValue, setInputValue] = useState('');
   const [skuArray, setSkuArray] = useState<string[]>([]);
   const [searchResults, setSearchResults] = useState<BatchSearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
 
   // Operation state
   const [operationType, setOperationType] = useState<'replace' | 'add'>('replace');
+  const [inputMethod, setInputMethod] = useState<'sku_paste' | 'sku_list' | 'url_list'>('sku_paste'); // Multiple input methods
   const [uploadMethod, setUploadMethod] = useState<'single' | 'zip'>('zip'); // Default to ZIP
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [zipFile, setZipFile] = useState<File | null>(null);
   const [altText, setAltText] = useState('');
+  const [fileExtension, setFileExtension] = useState<'png' | 'jpeg' | 'webp'>('png'); // Default PNG
 
   // Dimension state
   const [imageDimensions, setImageDimensions] = useState({ width: '640', height: '640' }); // Default 640x640
@@ -327,33 +331,138 @@ export default function BulkSkuWorkflow() {
 
   return (
     <div className="space-y-6">
-      {/* Step 1: Bulk SKU Input */}
+      {/* Step 1: Find Your Products */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
-            <Package className="h-5 w-5" />
-            <span>Step 1: Bulk SKU Input</span>
+            <Search className="h-5 w-5" />
+            <span>Step 1: Find Your Products</span>
           </CardTitle>
           <CardDescription>
-            Enter up to 30 SKUs. Supports copy-paste from Excel, Google Sheets, or Notepad
+            Choose how you want to find your products (up to 30 at a time)
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="bulk-sku">Product SKUs (one per line, or comma/tab separated)</Label>
-            <Textarea
-              id="bulk-sku"
-              placeholder="FL-001-XL&#10;FL-002-L&#10;FL-003-M&#10;..."
-              value={skuList}
-              onChange={(e) => handleSkuInputChange(e.target.value)}
-              className="min-h-[120px] font-mono text-sm"
-              data-testid="textarea-bulk-sku"
-            />
-            <div className="flex justify-between text-sm text-muted-foreground">
-              <span>{skuArray.length} SKUs parsed</span>
-              <span>Max: 30 SKUs</span>
-            </div>
+        <CardContent className="space-y-6">
+          {/* Input Method Selection */}
+          <div className="space-y-3">
+            <Label>How do you want to find products?</Label>
+            <RadioGroup value={inputMethod} onValueChange={(value: any) => setInputMethod(value)}>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="sku_paste" id="sku_paste" />
+                <Label htmlFor="sku_paste" className="flex items-center space-x-2">
+                  <Package className="h-4 w-4" />
+                  <span>Copy & Paste Product Codes (SKUs)</span>
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="sku_list" id="sku_list" />
+                <Label htmlFor="sku_list" className="flex items-center space-x-2">
+                  <FileText className="h-4 w-4" />
+                  <span>Type Product Codes One by One</span>
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="url_list" id="url_list" />
+                <Label htmlFor="url_list" className="flex items-center space-x-2">
+                  <Globe className="h-4 w-4" />
+                  <span>Use Product Web Links</span>
+                </Label>
+              </div>
+            </RadioGroup>
           </div>
+
+          <Separator />
+
+          {/* Input Area Based on Method */}
+          {inputMethod === 'sku_paste' && (
+            <div className="space-y-2">
+              <Label htmlFor="bulk-sku">Product Codes (one per line, or separated by commas)</Label>
+              <Textarea
+                id="bulk-sku"
+                placeholder="FL-001-XL&#10;FL-002-L&#10;FL-003-M&#10;..."
+                value={skuList}
+                onChange={(e) => handleSkuInputChange(e.target.value)}
+                className="min-h-[120px] font-mono text-sm"
+                data-testid="textarea-bulk-sku"
+              />
+              <div className="flex justify-between text-sm text-muted-foreground">
+                <span>{skuArray.length} codes found</span>
+                <span>Max: 30 products</span>
+              </div>
+            </div>
+          )}
+
+          {inputMethod === 'sku_list' && (
+            <div className="space-y-4">
+              <Label>Type your product codes:</Label>
+              <div className="flex space-x-2">
+                <Input
+                  placeholder="Enter a product code (e.g., FL-001-XL)"
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter' && inputValue.trim()) {
+                      if (skuArray.length < 30 && !skuArray.includes(inputValue.trim())) {
+                        setSkuArray(prev => [...prev, inputValue.trim()]);
+                        setInputValue('');
+                      }
+                    }
+                  }}
+                />
+                <Button 
+                  onClick={() => {
+                    if (inputValue.trim() && skuArray.length < 30 && !skuArray.includes(inputValue.trim())) {
+                      setSkuArray(prev => [...prev, inputValue.trim()]);
+                      setInputValue('');
+                    }
+                  }}
+                  disabled={!inputValue.trim() || skuArray.length >= 30 || skuArray.includes(inputValue.trim())}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add
+                </Button>
+              </div>
+              {skuArray.length > 0 && (
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm text-muted-foreground">
+                    <span>Added codes:</span>
+                    <span>{skuArray.length}/30</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1 p-2 border rounded-md max-h-24 overflow-y-auto">
+                    {skuArray.map((sku, index) => (
+                      <Badge key={index} variant="secondary" className="text-xs">
+                        {sku}
+                        <button 
+                          onClick={() => setSkuArray(prev => prev.filter((_, i) => i !== index))}
+                          className="ml-1 hover:text-red-500"
+                        >
+                          ×
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {inputMethod === 'url_list' && (
+            <div className="space-y-2">
+              <Label htmlFor="bulk-url">Product Web Links (one per line)</Label>
+              <Textarea
+                id="bulk-url"
+                placeholder="https://your-store.myshopify.com/products/product-name&#10;https://your-store.myshopify.com/admin/products/123456&#10;..."
+                value={skuList}
+                onChange={(e) => handleSkuInputChange(e.target.value)}
+                className="min-h-[120px] font-mono text-sm"
+                data-testid="textarea-bulk-url"
+              />
+              <div className="flex justify-between text-sm text-muted-foreground">
+                <span>{skuArray.length} links found</span>
+                <span>Max: 30 products</span>
+              </div>
+            </div>
+          )}
 
           {skuArray.length > 0 && (
             <div className="space-y-2">
@@ -370,6 +479,19 @@ export default function BulkSkuWorkflow() {
             </div>
           )}
 
+          {skuArray.length > 0 && (
+            <div className="space-y-2">
+              <Label>Found products:</Label>
+              <div className="flex flex-wrap gap-1 p-2 border rounded-md max-h-24 overflow-y-auto">
+                {skuArray.map((sku, index) => (
+                  <Badge key={index} variant="secondary" className="text-xs">
+                    {sku}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
+
           <Button 
             onClick={handleSearch}
             disabled={isSearching || skuArray.length === 0}
@@ -379,12 +501,12 @@ export default function BulkSkuWorkflow() {
             {isSearching ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                Searching Products...
+                Finding Products...
               </>
             ) : (
               <>
                 <Search className="h-4 w-4 mr-2" />
-                Search All Products
+                Find All Products
               </>
             )}
           </Button>
@@ -487,29 +609,29 @@ export default function BulkSkuWorkflow() {
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <Upload className="h-5 w-5" />
-              <span>Step 3: Bulk Operation Setup</span>
+              <span>Step 3: Choose Your Images</span>
             </CardTitle>
             <CardDescription>
-              Configure how to handle images for all found products
+              Tell us what you want to do with your product pictures
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             {/* Operation Type */}
             <div className="space-y-3">
-              <Label>Operation Type</Label>
+              <Label>What do you want to do?</Label>
               <RadioGroup value={operationType} onValueChange={(value: any) => setOperationType(value)}>
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="replace" id="replace" />
                   <Label htmlFor="replace" className="flex items-center space-x-2">
                     <Replace className="h-4 w-4" />
-                    <span>Replace existing images</span>
+                    <span>Replace old pictures with new ones</span>
                   </Label>
                 </div>
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="add" id="add" />
                   <Label htmlFor="add" className="flex items-center space-x-2">
                     <Plus className="h-4 w-4" />
-                    <span>Add new images</span>
+                    <span>Add new pictures (keep old ones too)</span>
                   </Label>
                 </div>
               </RadioGroup>
@@ -519,23 +641,40 @@ export default function BulkSkuWorkflow() {
 
             {/* Upload Method */}
             <div className="space-y-3">
-              <Label>Image Upload Method</Label>
+              <Label>How are your pictures organized?</Label>
               <RadioGroup value={uploadMethod} onValueChange={(value: any) => setUploadMethod(value)}>
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="single" id="single" />
                   <Label htmlFor="single" className="flex items-center space-x-2">
                     <FileText className="h-4 w-4" />
-                    <span>Single image (apply to all products)</span>
+                    <span>One picture for all products</span>
                   </Label>
                 </div>
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="zip" id="zip" />
                   <Label htmlFor="zip" className="flex items-center space-x-2">
                     <Archive className="h-4 w-4" />
-                    <span>ZIP file (images named by SKU)</span>
+                    <span>ZIP file with pictures named by product code</span>
                   </Label>
                 </div>
               </RadioGroup>
+            </div>
+
+            <Separator />
+
+            {/* File Extension Selection */}
+            <div className="space-y-3">
+              <Label>What picture type do you want to save?</Label>
+              <Select value={fileExtension} onValueChange={(value: any) => setFileExtension(value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose picture format" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="png">PNG - Best quality (recommended)</SelectItem>
+                  <SelectItem value="jpeg">JPEG - Smaller file size</SelectItem>
+                  <SelectItem value="webp">WebP - Modern format</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             {/* File Upload based on method */}
