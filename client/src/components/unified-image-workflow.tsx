@@ -56,6 +56,7 @@ export default function UnifiedImageWorkflow() {
   const [copyExistingAlt, setCopyExistingAlt] = useState(true);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>('');
+  const [fileExtension, setFileExtension] = useState<'png' | 'jpeg' | 'webp'>('png'); // Default PNG
   
   // Dimension state - default to 640x640
   const [imageDimensions, setImageDimensions] = useState({ width: '640', height: '640' });
@@ -301,15 +302,15 @@ export default function UnifiedImageWorkflow() {
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="sku" className="flex items-center space-x-2">
                 <Package className="h-4 w-4" />
-                <span>SKU</span>
+                <span>📎 Product Code</span>
               </TabsTrigger>
               <TabsTrigger value="url" className="flex items-center space-x-2">
                 <Globe className="h-4 w-4" />
-                <span>Product URL</span>
+                <span>🌐 Web Link</span>
               </TabsTrigger>
               <TabsTrigger value="direct_image" className="flex items-center space-x-2">
                 <Image className="h-4 w-4" />
-                <span>Direct Upload</span>
+                <span>📸 Upload Picture</span>
               </TabsTrigger>
             </TabsList>
 
@@ -478,8 +479,8 @@ export default function UnifiedImageWorkflow() {
           <CardContent className="space-y-4">
             <Tabs defaultValue="upload" className="w-full">
               <TabsList>
-                <TabsTrigger value="upload">Upload File</TabsTrigger>
-                <TabsTrigger value="url">Image URL</TabsTrigger>
+                <TabsTrigger value="upload">📎 Upload File</TabsTrigger>
+                <TabsTrigger value="url">🌐 Image URL</TabsTrigger>
               </TabsList>
               
               <TabsContent value="upload" className="space-y-4">
@@ -515,6 +516,24 @@ export default function UnifiedImageWorkflow() {
               </TabsContent>
             </Tabs>
 
+            {/* Image Extension Selection */}
+            <div className="space-y-3">
+              <Label>🖼️ What type of image files do you want?</Label>
+              <Select value={fileExtension} onValueChange={(value: any) => setFileExtension(value)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="png">📷 PNG - Best quality (recommended)</SelectItem>
+                  <SelectItem value="jpeg">🎨 JPEG - Smaller files</SelectItem>
+                  <SelectItem value="webp">✨ WebP - Super small & fast</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-sm text-muted-foreground">
+                PNG is best for crisp pictures. JPEG makes smaller files. WebP loads fastest!
+              </p>
+            </div>
+
             {/* Dimension Selection */}
             <div className="space-y-4">
               <div className="space-y-3">
@@ -527,7 +546,7 @@ export default function UnifiedImageWorkflow() {
                       data-testid="checkbox-custom-dimensions"
                     />
                     <Label htmlFor="custom-dimensions" className="text-sm">
-                      Set custom dimensions for image processing
+                      📏 Set custom size for image processing
                     </Label>
                   </div>
                   {!useCustomDimensions && (

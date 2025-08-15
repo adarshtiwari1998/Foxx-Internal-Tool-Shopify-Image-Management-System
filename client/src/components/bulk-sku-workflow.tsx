@@ -67,12 +67,13 @@ export default function BulkSkuWorkflow() {
 
   // Operation state
   const [operationType, setOperationType] = useState<'replace' | 'add'>('replace');
-  const [inputMethod, setInputMethod] = useState<'sku_paste' | 'sku_list' | 'url_list'>('sku_paste'); // Multiple input methods
+  const [inputMethod, setInputMethod] = useState<'sku_paste' | 'sku_list' | 'url_list' | 'direct_image'>('sku_paste'); // Multiple input methods including direct upload
   const [uploadMethod, setUploadMethod] = useState<'single' | 'zip'>('zip'); // Default to ZIP
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [zipFile, setZipFile] = useState<File | null>(null);
   const [altText, setAltText] = useState('');
   const [fileExtension, setFileExtension] = useState<'png' | 'jpeg' | 'webp'>('png'); // Default PNG
+  const [imagePreview, setImagePreview] = useState<string>(''); // Add image preview
 
   // Dimension state
   const [imageDimensions, setImageDimensions] = useState({ width: '640', height: '640' }); // Default 640x640
@@ -351,21 +352,28 @@ export default function BulkSkuWorkflow() {
                 <RadioGroupItem value="sku_paste" id="sku_paste" />
                 <Label htmlFor="sku_paste" className="flex items-center space-x-2">
                   <Package className="h-4 w-4" />
-                  <span>Copy & Paste Product Codes (SKUs)</span>
+                  <span>📋 Copy & Paste Product Codes</span>
                 </Label>
               </div>
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="sku_list" id="sku_list" />
                 <Label htmlFor="sku_list" className="flex items-center space-x-2">
                   <FileText className="h-4 w-4" />
-                  <span>Type Product Codes One by One</span>
+                  <span>✏️ Type Product Codes One by One</span>
                 </Label>
               </div>
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="url_list" id="url_list" />
                 <Label htmlFor="url_list" className="flex items-center space-x-2">
                   <Globe className="h-4 w-4" />
-                  <span>Use Product Web Links</span>
+                  <span>🌐 Use Product Web Links</span>
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="direct_image" id="direct_image" />
+                <Label htmlFor="direct_image" className="flex items-center space-x-2">
+                  <Upload className="h-4 w-4" />
+                  <span>📸 Upload Images Directly</span>
                 </Label>
               </div>
             </RadioGroup>
@@ -460,6 +468,23 @@ export default function BulkSkuWorkflow() {
               <div className="flex justify-between text-sm text-muted-foreground">
                 <span>{skuArray.length} links found</span>
                 <span>Max: 30 products</span>
+              </div>
+            </div>
+          )}
+
+          {inputMethod === 'direct_image' && (
+            <div className="space-y-4">
+              <div className="p-4 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg">
+                <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-2">📸 Direct Upload Mode</h4>
+                <p className="text-sm text-blue-700 dark:text-blue-300">
+                  In this mode, you can upload images directly to Shopify without linking to specific products.
+                  Perfect for preparing images that you'll organize later!
+                </p>
+              </div>
+              <div className="text-center py-8">
+                <Upload className="h-12 w-12 text-blue-500 mx-auto mb-4" />
+                <p className="text-lg font-medium">Ready to upload your images!</p>
+                <p className="text-sm text-muted-foreground">Choose your images in the next step.</p>
               </div>
             </div>
           )}
@@ -618,20 +643,20 @@ export default function BulkSkuWorkflow() {
           <CardContent className="space-y-6">
             {/* Operation Type */}
             <div className="space-y-3">
-              <Label>What do you want to do?</Label>
+              <Label>🎨 What do you want to do with the pictures?</Label>
               <RadioGroup value={operationType} onValueChange={(value: any) => setOperationType(value)}>
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="replace" id="replace" />
                   <Label htmlFor="replace" className="flex items-center space-x-2">
                     <Replace className="h-4 w-4" />
-                    <span>Replace old pictures with new ones</span>
+                    <span>🔄 Replace old pictures with new ones</span>
                   </Label>
                 </div>
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="add" id="add" />
                   <Label htmlFor="add" className="flex items-center space-x-2">
                     <Plus className="h-4 w-4" />
-                    <span>Add new pictures (keep old ones too)</span>
+                    <span>➕ Add new pictures (keep old ones too)</span>
                   </Label>
                 </div>
               </RadioGroup>
@@ -641,57 +666,89 @@ export default function BulkSkuWorkflow() {
 
             {/* Upload Method */}
             <div className="space-y-3">
-              <Label>How are your pictures organized?</Label>
+              <Label>📦 How are your pictures organized?</Label>
               <RadioGroup value={uploadMethod} onValueChange={(value: any) => setUploadMethod(value)}>
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="single" id="single" />
                   <Label htmlFor="single" className="flex items-center space-x-2">
                     <FileText className="h-4 w-4" />
-                    <span>One picture for all products</span>
+                    <span>🖼️ One picture for all products</span>
                   </Label>
                 </div>
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="zip" id="zip" />
                   <Label htmlFor="zip" className="flex items-center space-x-2">
                     <Archive className="h-4 w-4" />
-                    <span>ZIP file with pictures named by product code</span>
+                    <span>🗂 ZIP folder with pictures named by product code</span>
                   </Label>
                 </div>
               </RadioGroup>
+              <p className="text-sm text-muted-foreground">
+                💡 Tip: Use ZIP when you have different pictures for each product!
+              </p>
             </div>
 
             <Separator />
 
             {/* File Extension Selection */}
             <div className="space-y-3">
-              <Label>What picture type do you want to save?</Label>
+              <Label>🖼️ What type of picture files do you want?</Label>
               <Select value={fileExtension} onValueChange={(value: any) => setFileExtension(value)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Choose picture format" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="png">PNG - Best quality (recommended)</SelectItem>
-                  <SelectItem value="jpeg">JPEG - Smaller file size</SelectItem>
-                  <SelectItem value="webp">WebP - Modern format</SelectItem>
+                  <SelectItem value="png">📷 PNG - Best quality (recommended)</SelectItem>
+                  <SelectItem value="jpeg">🎨 JPEG - Smaller file size</SelectItem>
+                  <SelectItem value="webp">✨ WebP - Super small & fast</SelectItem>
                 </SelectContent>
               </Select>
+              <p className="text-sm text-muted-foreground">
+                PNG is best for crisp pictures. JPEG makes smaller files. WebP loads fastest!
+              </p>
             </div>
 
             {/* File Upload based on method */}
             {uploadMethod === 'single' && (
-              <div className="space-y-2">
-                <Label htmlFor="single-file">Select Image File</Label>
-                <Input
-                  id="single-file"
-                  type="file"
-                  accept="image/*"
-                  onChange={handleSingleFileSelect}
-                  ref={fileInputRef}
-                  data-testid="input-single-file"
-                />
-                {selectedFile && (
-                  <div className="text-sm text-muted-foreground">
-                    Selected: {selectedFile.name}
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="single-file">📎 Choose One Picture</Label>
+                  <Input
+                    id="single-file"
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      handleSingleFileSelect(e);
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        setImagePreview(URL.createObjectURL(file));
+                      }
+                    }}
+                    ref={fileInputRef}
+                    data-testid="input-single-file"
+                  />
+                  {selectedFile && (
+                    <div className="text-sm text-muted-foreground">
+                      Selected: {selectedFile.name} ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)
+                    </div>
+                  )}
+                  <p className="text-sm text-muted-foreground">
+                    🌈 This picture will be used for all your selected products
+                  </p>
+                </div>
+                
+                {/* Image Preview */}
+                {imagePreview && (
+                  <div className="space-y-2">
+                    <Label>👀 Picture Preview</Label>
+                    <div className="w-48 h-48 border-2 border-dashed border-gray-300 rounded-lg overflow-hidden">
+                      <img 
+                        src={imagePreview} 
+                        alt="Preview"
+                        className="w-full h-full object-cover"
+                        data-testid="img-bulk-preview"
+                      />
+                    </div>
                   </div>
                 )}
               </div>
