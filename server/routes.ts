@@ -1021,6 +1021,32 @@ async function processBatchOperations(
           continue;
         }
 
+        // Generate proper filename using same logic as single upload
+        const generateBulkImageFilename = (sku: string, productTitle: string, dimensions?: any) => {
+          const productTitleShort = productTitle
+            .split(' ')
+            .slice(0, 3) // First 3 words of title
+            .join('_')
+            .toLowerCase()
+            .replace(/[^a-z0-9_]/g, '');
+          
+          const dimensionStr = dimensions && dimensions.width && dimensions.height
+            ? `${dimensions.width}x${dimensions.height}`
+            : '640x640';
+          
+          return `${sku}_${dimensionStr}_${productTitleShort}.jpg`;
+        };
+
+        // Determine alt text - copy existing if available, otherwise use default
+        let altTextToUse = altText;
+        if (!altTextToUse && operationType === 'replace' && productVariant.image?.altText) {
+          altTextToUse = productVariant.image.altText;
+          console.log(`Copying existing alt text for ${sku}: "${altTextToUse}"`);
+        }
+        if (!altTextToUse) {
+          altTextToUse = `Image for ${sku}`;
+        }
+
         // Create operation record first
         const operation = await storage.createProductOperation({
           storeId: activeStore.id,
@@ -1033,7 +1059,7 @@ async function processBatchOperations(
           metadata: {
             sku: sku,
             dimensions: dimensions,
-            filename: `${sku}_${dimensions?.width || 'auto'}x${dimensions?.height || 'auto'}_${productVariant.product.title.split(' ').slice(0, 3).join('_')}.jpg`
+            filename: generateBulkImageFilename(sku, productVariant.product.title, dimensions)
           },
         });
 
@@ -1066,7 +1092,7 @@ async function processBatchOperations(
             result = await shopify.createProductMediaFromBuffer(
               productVariant.product.id, 
               imageBuffer, 
-              altText || `Image for ${sku}`
+              altTextToUse
             );
             
           } else if (operationType === 'add' && productVariant) {
@@ -1074,7 +1100,7 @@ async function processBatchOperations(
             result = await shopify.createProductMediaFromBuffer(
               productVariant.product.id, 
               imageBuffer, 
-              altText || `Image for ${sku}`
+              altTextToUse
             );
           }
           
@@ -1093,7 +1119,7 @@ async function processBatchOperations(
           // Update operation as successful
           await storage.updateProductOperation(operation.id, {
             status: 'success',
-            imageUrl: result?.url || imageUrl,
+            imageUrl: result?.url,
             altText,
             previewUrl,
             liveUrl,
