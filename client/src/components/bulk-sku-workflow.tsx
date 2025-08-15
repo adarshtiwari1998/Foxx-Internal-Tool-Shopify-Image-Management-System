@@ -570,10 +570,10 @@ export default function BulkSkuWorkflow() {
                       )}
                       
                       {/* Product Image Preview */}
-                      {result.product?.product?.images?.[0]?.src && (
+                      {(result.product?.image?.url || result.product?.product?.images?.edges?.[0]?.node?.url) && (
                         <img 
-                          src={result.product.product.images[0].src}
-                          alt={result.product.product.images[0].altText || 'Product image'}
+                          src={result.product.image?.url || result.product.product.images.edges[0].node.url}
+                          alt={result.product.image?.altText || result.product.product.images.edges?.[0]?.node?.altText || 'Product image'}
                           className="w-12 h-12 object-cover rounded border"
                           data-testid={`image-preview-${result.sku}`}
                         />
@@ -586,9 +586,9 @@ export default function BulkSkuWorkflow() {
                             {result.product.product.title} - {result.product.title}
                           </div>
                         )}
-                        {result.product?.product?.images?.[0]?.altText && (
+                        {(result.product?.image?.altText || result.product?.product?.images?.edges?.[0]?.node?.altText) && (
                           <div className="text-xs text-blue-600 truncate max-w-md">
-                            Alt: {result.product.product.images[0].altText}
+                            💬 Alt: {result.product.image?.altText || result.product.product.images.edges[0].node.altText}
                           </div>
                         )}
                         {result.error && (
