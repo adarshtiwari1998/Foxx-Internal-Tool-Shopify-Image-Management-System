@@ -666,9 +666,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const altText = req.body.altText || '';
       const dimensions = req.body.dimensions ? JSON.parse(req.body.dimensions) : undefined;
       
-      // Parse uploaded files
-      const singleFile = (req.files as any)?.singleFile?.[0];
-      const zipFile = (req.files as any)?.zipFile?.[0];
+      // Parse uploaded files - fix for upload.any() format
+      const singleFile = req.files ? (req.files as any[]).find((f: any) => f.fieldname === 'singleFile') : null;
+      const zipFile = req.files ? (req.files as any[]).find((f: any) => f.fieldname === 'zipFile') : null;
+      
+      console.log(`Files received: ${req.files ? (req.files as any[]).length : 0} total`);
+      if (req.files && Array.isArray(req.files)) {
+        (req.files as any[]).forEach((f, i) => console.log(`  File ${i}: fieldname='${f.fieldname}', name='${f.originalname}'`));
+      }
+      console.log(`Single file found: ${!!singleFile}`);
+      console.log(`ZIP file found: ${!!zipFile}`);
       
       // Parse individual files - improved handling
       const individualFiles: {[sku: string]: any} = {};
@@ -677,29 +684,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Check if files were uploaded using the individual file input method
         if (req.files && Array.isArray(req.files)) {
-          // Handle when files are uploaded with specific field names
+          // Handle individual files with upload.any() format
           for (let i = 0; i < 30; i++) {
             const fieldName = `individualFile_${i}`;
-            const file = (req.files as any).find((f: any) => f.fieldname === fieldName);
+            const file = (req.files as any[]).find((f: any) => f.fieldname === fieldName);
             const sku = req.body[`individualSku_${i}`];
             if (file && sku) {
               console.log(`Found individual file for SKU ${sku}: ${file.originalname}`);
               individualFiles[sku] = file;
             }
           }
-        } else if (req.files) {
-          // Handle when files are uploaded as object with field names as keys
-          Object.keys(req.files).forEach(fieldName => {
-            if (fieldName.startsWith('individualFile_')) {
-              const index = fieldName.replace('individualFile_', '');
-              const file = (req.files as any)[fieldName][0];
-              const sku = req.body[`individualSku_${index}`];
-              if (file && sku) {
-                console.log(`Found individual file for SKU ${sku}: ${file.originalname}`);
-                individualFiles[sku] = file;
-              }
-            }
-          });
         }
         
         console.log(`Individual files processed: ${Object.keys(individualFiles).length} files for SKUs: [${Object.keys(individualFiles).join(', ')}]`);
@@ -731,6 +725,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`=== BATCH OPERATION DEBUG ===`);
       console.log(`Upload method: ${uploadMethod}`);
       console.log(`ZIP file present: ${!!zipFile}`);
+      if (zipFile) console.log(`ZIP file details: ${zipFile.originalname} (${zipFile.size} bytes)`);
       console.log(`SKUs to process: [${skus.join(', ')}]`);
       
       if (uploadMethod === 'zip' && zipFile) {
